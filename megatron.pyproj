@@ -1,0 +1,190 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>6e9ff4b7-c9f5-46bc-89fe-ca6bf56de590</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <StartupFile>pretrain_bert.py</StartupFile>
+    <SearchPath>
+    </SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <Name>megatron</Name>
+    <RootNamespace>megatron</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="megatron\arguments.py" />
+    <Compile Include="megatron\checkpointing.py" />
+    <Compile Include="megatron\data\bert_dataset.py" />
+    <Compile Include="megatron\data\blendable_dataset.py" />
+    <Compile Include="megatron\data\dataset_utils.py" />
+    <Compile Include="megatron\data\data_loaders.py" />
+    <Compile Include="megatron\data\gpt_dataset.py" />
+    <Compile Include="megatron\data\ict_dataset.py" />
+    <Compile Include="megatron\data\indexed_dataset.py" />
+    <Compile Include="megatron\data\realm_dataset_utils.py" />
+    <Compile Include="megatron\data\realm_index.py" />
+    <Compile Include="megatron\data\test\test_indexed_dataset.py" />
+    <Compile Include="megatron\data\__init__.py" />
+    <Compile Include="megatron\fp16_deprecated\loss_scaler.py" />
+    <Compile Include="megatron\fused_kernels\__init__.py" />
+    <Compile Include="megatron\global_vars.py" />
+    <Compile Include="megatron\indexer.py" />
+    <Compile Include="megatron\initialize.py" />
+    <Compile Include="megatron\learning_rates.py" />
+    <Compile Include="megatron\memory.py" />
+    <Compile Include="megatron\microbatches.py" />
+    <Compile Include="megatron\model\bert_model.py" />
+    <Compile Include="megatron\model\classification.py" />
+    <Compile Include="megatron\model\distributed.py" />
+    <Compile Include="megatron\model\fused_bias_gelu.py" />
+    <Compile Include="megatron\model\fused_layer_norm.py" />
+    <Compile Include="megatron\model\fused_softmax.py" />
+    <Compile Include="megatron\model\gpt_model.py" />
+    <Compile Include="megatron\model\language_model.py" />
+    <Compile Include="megatron\model\module.py" />
+    <Compile Include="megatron\model\multiple_choice.py" />
+    <Compile Include="megatron\model\realm_model.py" />
+    <Compile Include="megatron\model\transformer.py" />
+    <Compile Include="megatron\model\utils.py" />
+    <Compile Include="megatron\model\__init__.py" />
+    <Compile Include="megatron\mpu\cross_entropy.py" />
+    <Compile Include="megatron\mpu\data.py" />
+    <Compile Include="megatron\mpu\initialize.py" />
+    <Compile Include="megatron\mpu\layers.py" />
+    <Compile Include="megatron\mpu\mappings.py" />
+    <Compile Include="megatron\mpu\random.py" />
+    <Compile Include="megatron\mpu\tests\commons.py" />
+    <Compile Include="megatron\mpu\tests\test_cross_entropy.py" />
+    <Compile Include="megatron\mpu\tests\test_data.py" />
+    <Compile Include="megatron\mpu\tests\test_initialize.py" />
+    <Compile Include="megatron\mpu\tests\test_layers.py" />
+    <Compile Include="megatron\mpu\tests\test_random.py" />
+    <Compile Include="megatron\mpu\tests\__init__.py" />
+    <Compile Include="megatron\mpu\utils.py" />
+    <Compile Include="megatron\mpu\__init__.py" />
+    <Compile Include="megatron\optimizer\clip_grads.py" />
+    <Compile Include="megatron\optimizer\grad_scaler.py" />
+    <Compile Include="megatron\optimizer\optimizer.py" />
+    <Compile Include="megatron\optimizer\__init__.py" />
+    <Compile Include="megatron\package_info.py" />
+    <Compile Include="megatron\text_generation_utils.py" />
+    <Compile Include="megatron\tokenizer\bert_tokenization.py" />
+    <Compile Include="megatron\tokenizer\gpt2_tokenization.py" />
+    <Compile Include="megatron\tokenizer\tokenizer.py" />
+    <Compile Include="megatron\tokenizer\__init__.py" />
+    <Compile Include="megatron\training.py" />
+    <Compile Include="megatron\utils.py" />
+    <Compile Include="megatron\__init__.py" />
+    <Compile Include="pretrain_bert.py" />
+    <Compile Include="pretrain_gpt.py" />
+    <Compile Include="pretrain_ict.py" />
+    <Compile Include="setup.py" />
+    <Compile Include="tasks\data_utils.py" />
+    <Compile Include="tasks\ensemble_classifier.py" />
+    <Compile Include="tasks\eval_utils.py" />
+    <Compile Include="tasks\finetune_utils.py" />
+    <Compile Include="tasks\glue\data.py" />
+    <Compile Include="tasks\glue\finetune.py" />
+    <Compile Include="tasks\glue\mnli.py" />
+    <Compile Include="tasks\glue\qqp.py" />
+    <Compile Include="tasks\main.py" />
+    <Compile Include="tasks\race\data.py" />
+    <Compile Include="tasks\race\finetune.py" />
+    <Compile Include="tasks\zeroshot_gpt2\datasets.py" />
+    <Compile Include="tasks\zeroshot_gpt2\detokenizer.py" />
+    <Compile Include="tasks\zeroshot_gpt2\evaluate.py" />
+    <Compile Include="tools\create_doc_index.py" />
+    <Compile Include="tools\generate_samples_gpt.py" />
+    <Compile Include="tools\linter.py" />
+    <Compile Include="tools\merge_mp_partitions.py" />
+    <Compile Include="tools\openwebtext\blacklist_urls.py" />
+    <Compile Include="tools\openwebtext\cleanup_dataset.py" />
+    <Compile Include="tools\openwebtext\find_duplicates.py" />
+    <Compile Include="tools\openwebtext\group_duplicate_url.py" />
+    <Compile Include="tools\openwebtext\merge_jsons.py" />
+    <Compile Include="tools\openwebtext\remove_group_duplicates.py" />
+    <Compile Include="tools\preprocess_data.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="examples\" />
+    <Folder Include="images\" />
+    <Folder Include="megatron\" />
+    <Folder Include="megatron\data\" />
+    <Folder Include="megatron\data\test\" />
+    <Folder Include="megatron\fp16_deprecated\" />
+    <Folder Include="megatron\fused_kernels\" />
+    <Folder Include="megatron\model\" />
+    <Folder Include="megatron\mpu\" />
+    <Folder Include="megatron\mpu\tests\" />
+    <Folder Include="megatron\optimizer\" />
+    <Folder Include="megatron\tokenizer\" />
+    <Folder Include="pretrained\" />
+    <Folder Include="tasks\" />
+    <Folder Include="tasks\glue\" />
+    <Folder Include="tasks\race\" />
+    <Folder Include="tasks\zeroshot_gpt2\" />
+    <Folder Include="tools\" />
+    <Folder Include="tools\openwebtext\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="examples\evaluate_zeroshot_gpt.sh" />
+    <Content Include="examples\finetune_mnli_distributed.sh" />
+    <Content Include="examples\finetune_race_distributed.sh" />
+    <Content Include="examples\generate_text.sh" />
+    <Content Include="examples\merge_mp_bert.sh" />
+    <Content Include="examples\pretrain_bert.sh" />
+    <Content Include="examples\pretrain_bert_distributed.sh" />
+    <Content Include="examples\pretrain_bert_distributed_with_mp.sh" />
+    <Content Include="examples\pretrain_gpt.sh" />
+    <Content Include="examples\pretrain_gpt3_175B.sh" />
+    <Content Include="examples\pretrain_gpt_distributed.sh" />
+    <Content Include="examples\pretrain_gpt_distributed_with_mp.sh" />
+    <Content Include="images\cases_jan2021.png" />
+    <Content Include="images\Makefile" />
+    <Content Include="images\scaling.png" />
+    <Content Include="images\tables.tex" />
+    <Content Include="LICENSE" />
+    <Content Include="MANIFEST.in" />
+    <Content Include="megatron\data\helpers.cpp" />
+    <Content Include="megatron\data\Makefile" />
+    <Content Include="megatron\data\test\test_preprocess_data.sh" />
+    <Content Include="megatron\fused_kernels\compat.h" />
+    <Content Include="megatron\fused_kernels\layer_norm_cuda.cpp" />
+    <Content Include="megatron\fused_kernels\layer_norm_cuda_kernel.cu" />
+    <Content Include="megatron\fused_kernels\scaled_masked_softmax.cpp" />
+    <Content Include="megatron\fused_kernels\scaled_masked_softmax.h" />
+    <Content Include="megatron\fused_kernels\scaled_masked_softmax_cuda.cu" />
+    <Content Include="megatron\fused_kernels\scaled_upper_triang_masked_softmax.cpp" />
+    <Content Include="megatron\fused_kernels\scaled_upper_triang_masked_softmax.h" />
+    <Content Include="megatron\fused_kernels\scaled_upper_triang_masked_softmax_cuda.cu" />
+    <Content Include="megatron\fused_kernels\type_shim.h" />
+    <Content Include="pretrained\bert-large-cased-vocab.txt" />
+    <Content Include="pretrained\bert-large-uncased-vocab.txt" />
+    <Content Include="pretrained\gpt2-merges.txt" />
+    <Content Include="pretrained\gpt2-vocab.json" />
+    <Content Include="pretrained\megatron_bert_345m_v0.1_cased.zip" />
+    <Content Include="pretrained\megatron_bert_345m_v0.1_uncased.zip" />
+    <Content Include="pretrained\megatron_lm_345m_v0.0.zip" />
+    <Content Include="README.md" />
+    <Content Include="requirements.txt" />
+    <Content Include="tools\openwebtext\README.md" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+  <!-- Uncomment the CoreCompile target to enable the Build command in
+       Visual Studio and specify your pre- and post-build commands in
+       the BeforeBuild and AfterBuild targets below. -->
+  <!--<Target Name="CoreCompile" />-->
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+</Project>
