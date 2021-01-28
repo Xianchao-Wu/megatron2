@@ -54,16 +54,19 @@ def parse_args(extra_args_provider=None, defaults={},
     # Distributed args.
     args.rank = int(os.getenv('RANK', '0'))
     args.world_size = int(os.getenv("WORLD_SIZE", '1'))
+
     # Tensor model parallel size.
     args.tensor_model_parallel_size = min(
         args.tensor_model_parallel_size, args.world_size)
     assert args.world_size % args.tensor_model_parallel_size == 0, 'world size'\
         ' ({}) is not divisible by tensor model parallel size ({})'.format(
             args.world_size, args.tensor_model_parallel_size)
+
     # Pipeline model parallel size.
     args.pipeline_model_parallel_size = min(
         args.pipeline_model_parallel_size,
         (args.world_size // args.tensor_model_parallel_size))
+
     # Checks.
     model_parallel_size = args.pipeline_model_parallel_size * \
                           args.tensor_model_parallel_size
@@ -138,7 +141,7 @@ def parse_args(extra_args_provider=None, defaults={},
         assert args.lr_warmup_samples == 0, \
             'expected iteration-based learning rate warmup'
         assert args.rampup_batch_size is None, \
-            'expected no batch-size rampup for iteration-based training'
+            'expected no batch-size rampup for iteration-based training' # 倾斜升温，上升
         if args.lr_warmup_fraction is not None:
             assert args.lr_warmup_iters == 0, \
                 'can only specify one of lr-warmup-fraction and lr-warmup-iters'
@@ -171,7 +174,8 @@ def parse_args(extra_args_provider=None, defaults={},
         assert args.min_lr <= args.lr
     if args.save is not None:
         assert args.save_interval is not None
-    # Mixed precision checks.
+
+    # Mixed precision checks. [混合精度检查]
     if args.fp16_lm_cross_entropy:
         assert args.fp16, 'lm cross entropy in fp16 only support in fp16 mode.'
     if args.fp32_residual_connection:
@@ -180,7 +184,7 @@ def parse_args(extra_args_provider=None, defaults={},
     # Activation checkpointing.
     if args.distribute_checkpointed_activations:
         assert args.checkpoint_activations, \
-            'for distribute-checkpointed-activations to work you '\
+            'for distribute-checkpointed-activations to work, you '\
             'need to enable checkpoint-activations'
 
     if args.scaled_masked_softmax_fusion:
@@ -243,7 +247,7 @@ def _add_network_size_args(parser):
                        'ordering.')
     group.add_argument('--openai-gelu', action='store_true',
                        help='Use OpenAIs GeLU implementation. This option'
-                       'should not be used unless for backward compatibility'
+                       'should not be used unless for backward compatibility' # 兼容性
                        'reasons.')
     group.add_argument('--onnx-safe', type=bool, required=False,
                        help='Use workarounds for known problems with Torch ONNX exporter')
@@ -269,7 +273,7 @@ def _add_regularization_args(parser):
                        help='Second coefficient for computing running averages of'
                        'gradient and its square')
     group.add_argument('--adam-eps', type=float, default=1e-08,
-                       help='Term added to the denominator to improve'
+                       help='Term added to the denominator to improve' # 分母上加adam-epsilon
                        'numerical stability')
 
     return parser
@@ -293,7 +297,7 @@ def _add_training_args(parser):
                        'global batch size. This choice will result in 1 for '
                        'number of micro-batches.')
     group.add_argument('--rampup-batch-size', nargs='*', default=None,
-                       help='Batch size ramp up with the following values:'
+                       help='Batch size ramp up (斜升) with the following values:'
                        '  --rampup-batch-size <start batch size> '
                        '                      <batch size incerement> '
                        '                      <ramp-up samples> '

@@ -95,7 +95,7 @@ class Pooler(MegatronModule):
         self.dense = get_linear_layer(hidden_size, hidden_size, init_method)
 
     def forward(self, hidden_states, sequence_index=0):
-        # hidden_states: [b, s, h]
+        # hidden_states: [b, s, h] where b=batch size, s=sequence len, h=hidden size
         # sequence_index: index of the token to pool.
         pooled = hidden_states[:, sequence_index, :]
         pooled = self.dense(pooled)

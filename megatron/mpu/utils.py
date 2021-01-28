@@ -38,6 +38,8 @@ def split_tensor_along_last_dim(tensor, num_partitions,
         num_partitions: number of partitions to split the tensor
         contiguous_split_chunks: If True, make each chunk contiguous
                                  in memory.
+    Return:
+        tuple of torch.tensor objects.
     """
     # Get the size and dimension.
     last_dim = tensor.dim() - 1
@@ -52,19 +54,22 @@ def split_tensor_along_last_dim(tensor, num_partitions,
 
 
 class VocabUtility:
-    """Split the vocabulary into `world_size` chunks amd return the
+    """Split the vocabulary into `world_size` (num of gpus) chunks amd return the
         first and last index of the vocabulary belonging to the `rank`
-        partition: Note that indecies in [fist, last)"""
+        partition: Note that indecies in [first, last)"""
 
     @staticmethod
     def vocab_range_from_per_partition_vocab_size(per_partition_vocab_size,
                                                   rank, world_size):
-        index_f = rank * per_partition_vocab_size
-        index_l = index_f + per_partition_vocab_size
+        """返回子词表的[index_first, index_last)，两个index """
+        index_f = rank * per_partition_vocab_size # first, inclusive
+        index_l = index_f + per_partition_vocab_size # last, exclusive
         return index_f, index_l
 
     @staticmethod
     def vocab_range_from_global_vocab_size(global_vocab_size, rank, world_size):
-        per_partition_vocab_size = divide(global_vocab_size, world_size)
+        """当前rank的gpu所覆盖的子词表index: [index_first, index_last)"""
+        # 需要确保 global_vocab_size % world_size == 0!
+        per_partition_vocab_size = divide(global_vocab_size, world_size) # alike [global_vocab_size/world_size] 
         return VocabUtility.vocab_range_from_per_partition_vocab_size(
             per_partition_vocab_size, rank, world_size)

@@ -15,7 +15,7 @@
 
 """Megatron optimizer."""
 
-from abc import ABC
+from abc import ABC # abstract class
 from abc import abstractmethod
 
 import torch
@@ -62,11 +62,14 @@ def _multi_tensor_copy_this_to_that(this, that, overflow_buf=None):
                          [this, that], # tensor_lists
                          1.0) # float scale, *args
     # apex/csrc/amp_C_frontend.cpp
-    # void multi_tensor_scale_cuda(int chunk_size, at::Tensor noop_flag, std::vector<std::vector<at::Tensor>> tensor_lists, float scale)
+    # void multi_tensor_scale_cuda(int chunk_size, at::Tensor noop_flag, std::vector<std::vector<at::Tensor>> 
+    #     tensor_lists, float scale)
     # 实现在: apex/csrc/multi_tensor_scale_kernel.cu [完全看不懂...]
 
 
 class MegatronOptimizer(ABC):
+    """Abstract class, define abstract methods such as, zero_grad, get_loss_scale, step, 
+    reload_method_params, state_dict, and load_state_dict"""
 
     def __init__(self, optimizer):
         """Input optimizer is the base optimizer for example Adam."""
@@ -117,7 +120,7 @@ class MegatronOptimizer(ABC):
     # Promote state so it can be retrieved or set via
     # "optimizer_instance.state"
     def _get_state(self):
-        return self.optimizer.state
+        return self.optimizer.state # TODO what are included in "state"?
 
     def _set_state(self, value):
         self.optimizer.state = value

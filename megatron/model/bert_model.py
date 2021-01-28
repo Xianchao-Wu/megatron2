@@ -22,7 +22,7 @@ from megatron import mpu
 from megatron.model.language_model import parallel_lm_logits
 from megatron.model.language_model import get_language_model
 from megatron.model import import_layernorm
-from megatron.model.utils import openai_gelu, erf_gelu
+from megatron.model.utils import openai_gelu, erf_gelu # erf = error function? or gauss error function?
 from megatron.model.utils import get_linear_layer
 from megatron.model.utils import init_method_normal
 from megatron.model.utils import scaled_init_method_normal
@@ -39,7 +39,7 @@ def bert_extended_attention_mask(attention_mask):
     # [b, s, 1]
     attention_mask_bs1 = attention_mask.unsqueeze(2)
     # [b, s, s]
-    attention_mask_bss = attention_mask_b1s * attention_mask_bs1
+    attention_mask_bss = attention_mask_b1s * attention_mask_bs1 # TODO strange, (1,s) * (s,1) -> (1,1)?
     # [b, 1, s, s]
     extended_attention_mask = attention_mask_bss.unsqueeze(1)
 

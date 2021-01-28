@@ -36,19 +36,23 @@ from .global_vars import get_timers
 from .initialize  import initialize_megatron
 
 def print_rank_0(message):
-    """If distributed is initialized, print only on rank 0."""
+    """If distributed is initialized, print only on rank 0. (first gpu)"""
     if torch.distributed.is_initialized():
         if torch.distributed.get_rank() == 0:
             print(message, flush=True)
+            # flush参数主要是刷新， 默认flush = False，不刷新，如上面例子，
+            # print到f中的内容先存到内存中，当文件对象关闭时才把内容输出到 123.txt 中；
+            # 而当flush = True时它会立即把内容刷新存到 123.txt 中。
     else:
         print(message, flush=True)
 
 def is_last_rank():
+    """check if current GPU is the gpu with the max rank (final indexed GPU)"""
     return torch.distributed.get_rank() == (
         torch.distributed.get_world_size() - 1)
 
 def print_rank_last(message):
-    """If distributed is initialized, print only on last rank."""
+    """If distributed is initialized, print only on last rank. (last gpu)"""
     if torch.distributed.is_initialized():
         if is_last_rank():
             print(message, flush=True)
