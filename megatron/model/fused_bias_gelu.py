@@ -25,16 +25,19 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 # 1/sqrt(2)   -> 0.70710678
 # sqrt(2/pi)  -> 0.79788456
 # this function is tanh approximation of gelu
-# actual gelu is:
+# actual gelu (Gaussian Error Linear Units - GELUs) is:
 # x * 0.5 * (1.0 + torch.erf(x * 0.70710678))
 
 @torch.jit.script
 def bias_gelu(bias, y):
     x = bias + y
     return  x * 0.5 * (1.0 + torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
+    # 这里使用的是原始gelu函数的定义：
+    # GELU(x) = 0.5*x*(1.0+tanh(sqrt(2/pi)*x*(1.0+0.044715*x*x)))
+    # from paper: https://arxiv.org/pdf/1606.08415.pdf Gaussian Error Linear Units (GELUs)
 
 # gradient of tanh approximation of gelu
-# gradient of actual gelu is:
+# gradient of actual gelu (gelu的梯度) is:
 # 0.5 * (1. + torch.erf(x * 0.70710678)) + 0.3989423 * x * torch.exp(-0.5 * x * x)
 @torch.jit.script
 def bias_gelu_back(g, bias, y):
@@ -44,10 +47,10 @@ def bias_gelu_back(g, bias, y):
     ff = 0.5 * x * ((1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * x * x)) + 0.5 * (1 + tanh_out)
     return ff*g
 
-class GeLUFunction(torch.autograd.Function):
+class GeLUFunction(torch.autograd.Function): # 相当于，关于自定义的激活函数gelu的forward和backward的细节实现！
     @staticmethod
     # bias is an optional argument
-    def forward(ctx, input, bias):
+    def forward(ctx, input, bias): # TODO what is ctx? 相当于class中的self
         ctx.save_for_backward(input, bias)
         return bias_gelu(bias, input)
 

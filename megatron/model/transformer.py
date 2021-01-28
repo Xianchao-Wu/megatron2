@@ -56,7 +56,7 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 """
 
 class ParallelMLP(MegatronModule):
-    """MLP.
+    """MLP (alike position-wise feed-forward linear layer in original transformer).
 
     MLP will take the input with h hidden state, project it to 4*h
     hidden dimension, perform nonlinear transformation, and project the
@@ -68,7 +68,7 @@ class ParallelMLP(MegatronModule):
         super(ParallelMLP, self).__init__()
         args = get_args()
 
-        # Project to 4h: (alike position-wise feed-forward layer in transformer)
+        # [first linear layer] Project to 4h: (alike position-wise feed-forward layer in transformer)
         self.dense_h_to_4h = mpu.ColumnParallelLinear( # TODO use mpu's 列并行-linear-layer
             args.hidden_size, # input.size
             4 * args.hidden_size, # output.size
@@ -76,14 +76,14 @@ class ParallelMLP(MegatronModule):
             init_method=init_method, # 初始化方法
             skip_bias_add=True)
 
-        self.bias_gelu_fusion = args.bias_gelu_fusion
+        self.bias_gelu_fusion = args.bias_gelu_fusion # default=True, enable or disable "bias and gelu fusion"
         self.activation_func = F.gelu
         if args.openai_gelu:
             self.activation_func = openai_gelu
         elif args.onnx_safe:
             self.activation_func = erf_gelu
 
-        # Project back to h.
+        # [second linear layer] Project back to h.
         self.dense_4h_to_h = mpu.RowParallelLinear( # TODO use mpu's 行并行-linear-layer
             4 * args.hidden_size,
             args.hidden_size,
@@ -99,7 +99,7 @@ class ParallelMLP(MegatronModule):
 
         if self.bias_gelu_fusion:
              intermediate_parallel = \
-                     bias_gelu_impl(intermediate_parallel, bias_parallel)
+                     bias_gelu_impl(intermediate_parallel, bias_parallel) # TODO
         else:
             intermediate_parallel = \
                 self.activation_func(intermediate_parallel + bias_parallel)
@@ -542,7 +542,7 @@ class ParallelTransformer(MegatronModule):
                 return x_
             return custom_forward
 
-        # Make sure memory is freed.
+        # Make sure memory is freed/被释放.
         mpu.reset_checkpointed_activations_memory_buffer()
         l = 0
         while l < self.num_layers:
@@ -570,7 +570,7 @@ class ParallelTransformer(MegatronModule):
             # Data format change to avoid explicit tranposes : [b s h] --> [s b h].
             # If the input flag for fp32 residual connection is set, convert for float.
             if self.fp32_residual_connection:
-                hidden_states = hidden_states.transpose(0, 1).contiguous().float()
+                hidden_states = hidden_states.transpose(0, 1).contiguous().float() # possibly from fp16 to fp32
             # Otherwise, leave it as is.
             else:
                 hidden_states = hidden_states.transpose(0, 1).contiguous()

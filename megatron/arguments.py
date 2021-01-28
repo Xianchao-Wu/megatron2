@@ -344,9 +344,9 @@ def _add_training_args(parser):
                        help='Use upper triangular version of fused '
                        'scale, mask, softmax fusion kernel (default for GPT). '
                        '- DEPRECATED')
-    group.add_argument('--no-bias-gelu-fusion', action='store_false',
+    group.add_argument('--no-bias-gelu-fusion', action='store_false', # store_false也就是默认为True，一旦命令中有此参数，其值则变为False。
                        help='Disable bias and gelu fusion.',
-                       dest='bias_gelu_fusion')
+                       dest='bias_gelu_fusion') # dest - 被添加到 parse_args() 所返回对象上的属性名
     group.add_argument('--no-bias-dropout-fusion', action='store_false',
                        help='Disable bias and dropout fusion.',
                        dest='bias_dropout_fusion')
