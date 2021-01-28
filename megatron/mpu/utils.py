@@ -70,6 +70,6 @@ class VocabUtility:
     def vocab_range_from_global_vocab_size(global_vocab_size, rank, world_size):
         """当前rank的gpu所覆盖的子词表index: [index_first, index_last)"""
         # 需要确保 global_vocab_size % world_size == 0!
-        per_partition_vocab_size = divide(global_vocab_size, world_size) # alike [global_vocab_size/world_size] 
+        per_partition_vocab_size = divide(global_vocab_size, world_size) # alike [global_vocab_size//world_size] 
         return VocabUtility.vocab_range_from_per_partition_vocab_size(
             per_partition_vocab_size, rank, world_size)

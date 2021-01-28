@@ -24,11 +24,11 @@ from megatron import mpu
 from .module import MegatronModule
 from megatron.checkpointing import get_checkpoint_version
 from megatron.model import import_layernorm
-from megatron.model.fused_softmax import FusedScaleMaskSoftmax
+from megatron.model.fused_softmax import FusedScaleMaskSoftmax # 融合的=fused
 from megatron.model.fused_bias_gelu import bias_gelu_impl
 from megatron.model.utils import openai_gelu, erf_gelu
 
-# flags required to enable jit fusion kernels
+# flags required to enable [jit fusion kernels, TODO]
 torch._C._jit_set_profiling_mode(False)
 torch._C._jit_set_profiling_executor(False)
 torch._C._jit_override_can_fuse_on_cpu(True)
@@ -68,12 +68,12 @@ class ParallelMLP(MegatronModule):
         super(ParallelMLP, self).__init__()
         args = get_args()
 
-        # Project to 4h.
-        self.dense_h_to_4h = mpu.ColumnParallelLinear(
-            args.hidden_size,
-            4 * args.hidden_size,
+        # Project to 4h: (alike position-wise feed-forward layer in transformer)
+        self.dense_h_to_4h = mpu.ColumnParallelLinear( # TODO use mpu's 列并行-linear-layer
+            args.hidden_size, # input.size
+            4 * args.hidden_size, # output.size
             gather_output=False,
-            init_method=init_method,
+            init_method=init_method, # 初始化方法
             skip_bias_add=True)
 
         self.bias_gelu_fusion = args.bias_gelu_fusion
@@ -84,11 +84,11 @@ class ParallelMLP(MegatronModule):
             self.activation_func = erf_gelu
 
         # Project back to h.
-        self.dense_4h_to_h = mpu.RowParallelLinear(
+        self.dense_4h_to_h = mpu.RowParallelLinear( # TODO use mpu's 行并行-linear-layer
             4 * args.hidden_size,
             args.hidden_size,
             input_is_parallel=True,
-            init_method=output_layer_init_method,
+            init_method=output_layer_init_method, # 输出层的初始化方法
             skip_bias_add=True)
          
 
@@ -145,7 +145,7 @@ class ParallelSelfAttention(MegatronModule):
             gather_output=False,
             init_method=init_method)
 
-        coeff = None
+        coeff = None # 系数 coefficient
         self.norm_factor = math.sqrt(self.hidden_size_per_attention_head)
         if self.apply_query_key_layer_scaling:
             coeff = self.layer_number
