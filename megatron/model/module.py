@@ -39,7 +39,12 @@ class MegatronModule(torch.nn.Module):
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',
                                        keep_vars=False):
         """Use this function to override the state dict for
-        saving checkpoints."""
+        saving checkpoints.
+        Arguments:
+            destination : (None)
+            prefix : ('')
+            keep_vars : (False)
+        """
         return self.state_dict(destination, prefix, keep_vars)
 
 
@@ -61,8 +66,8 @@ class MegatronModule(torch.nn.Module):
             raise Exception('initialize_word_embeddings() was called but '
                             'share_word_embeddings is false')
         # Parameters are shared between the word embeddings layer, and the
-        # heads at the end of the model. In a pipelined setup with more than
-        # one stage, the initial embedding layer and the head are on different
+        # heads (TODO what is head?) at the end of the model. In a pipelined setup with more than
+        # one stage (TODO 状态是啥?), the initial embedding layer and the head are on different
         # workers, so we do the following:
         # 1. Create a second copy of word_embeddings on the last stage, with
         #    initial parameters of 0.0.
@@ -94,12 +99,12 @@ class MegatronModule(torch.nn.Module):
 def conversion_helper(val, conversion):
     """Apply conversion to val. Recursively apply conversion if `val`
     #is a nested tuple/list structure."""
-    if not isinstance(val, (tuple, list)):
+    if not isinstance(val, (tuple, list)): # 递归调用的出口
         return conversion(val)
-    rtn = [conversion_helper(v, conversion) for v in val]
-    if isinstance(val, tuple):
+    rtn = [conversion_helper(v, conversion) for v in val] # 递归调用，一层展开
+    if isinstance(val, tuple): # 最初的输入val是“元组”的时候：
         rtn = tuple(rtn)
-    return rtn
+    return rtn # 最初的输入val是list的时候。
 
 
 def fp32_to_fp16(val):
@@ -108,10 +113,11 @@ def fp32_to_fp16(val):
         val_typecheck = val
         if isinstance(val_typecheck, (Parameter, Variable)):
             val_typecheck = val.data
-        if isinstance(val_typecheck, _FLOAT_TYPES):
+        if isinstance(val_typecheck, _FLOAT_TYPES): 
+            # _FLOAT_TYPES = (torch.FloatTensor, torch.cuda.FloatTensor)
             val = val.half()
         return val
-    return conversion_helper(val, half_conversion)
+    return conversion_helper(val, half_conversion) # 递归的把val中所有数值转换为fp16!
 
 
 def fp16_to_fp32(val):
@@ -121,9 +127,10 @@ def fp16_to_fp32(val):
         if isinstance(val_typecheck, (Parameter, Variable)):
             val_typecheck = val.data
         if isinstance(val_typecheck, _HALF_TYPES):
+            # _HALF_TYPES = (torch.HalfTensor, torch.cuda.HalfTensor)
             val = val.float()
         return val
-    return conversion_helper(val, float_conversion)
+    return conversion_helper(val, float_conversion) # 递归的把val中所有的数值转换为fp32
 
 
 

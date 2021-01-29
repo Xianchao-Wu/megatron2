@@ -224,8 +224,8 @@ class ParallelSelfAttention(MegatronModule):
 
         # [sq, b, (np * 3 * hn)] --> [sq, b, np, 3 * hn]
         new_tensor_shape = mixed_x_layer.size()[:-1] + \
-            (self.num_attention_heads_per_partition,
-             3 * self.hidden_size_per_attention_head)
+            (self.num_attention_heads_per_partition, # 每个划分中的 注意力head 的数量
+             3 * self.hidden_size_per_attention_head) # 每个 attention head的对应的hidden size
         mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
 
         # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
@@ -371,7 +371,7 @@ def bias_dropout_add(x, bias, residual, prob, training) :
 def get_bias_dropout_add(training):
     def _bias_dropout_add(x, bias, residual, prob):
         return bias_dropout_add(x, bias, residual, prob, training)
-    return _bias_dropout_add
+    return _bias_dropout_add # 返回的是方法
 
 
 @torch.jit.script

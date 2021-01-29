@@ -33,6 +33,12 @@ class DistributedDataParallel(MegatronModule):
         self.data_parallel_group = mpu.get_data_parallel_group()
 
         def allreduce_params(reduce_after=True, no_scale=False, fp32_allreduce=False):
+            """Added three input variables, diff from https://github.com/Xianchao-Wu/tacotron2/blob/main/distributed.py
+            Arguments:
+                reduce_after : if True, scale after `all_reduce`; otherwise, scale before `all_reduce`
+                no_scale : without scale (bool) based on `world_size`, i.e., no scale, if no_scale=True; i.e., perform scaling if not no_scale
+                fp32_allreduce : execute all_reduce based on fp32 tensors
+            """
             if(self.needs_reduction):
                 self.needs_reduction = False
                 buckets = {}
@@ -50,12 +56,14 @@ class DistributedDataParallel(MegatronModule):
                 for tp in buckets:
                     bucket = buckets[tp]
                     grads = [param.grad.data for param in bucket]
-                    coalesced = _flatten_dense_tensors(grads)
+                    coalesced = _flatten_dense_tensors(grads) # 合并，联合成一个1d tensor
                     if fp32_allreduce:
                         coalesced = coalesced.float()
                     if not no_scale and not reduce_after:
                         coalesced /= dist.get_world_size(group=self.data_parallel_group)
-                    dist.all_reduce(coalesced, group=self.data_parallel_group)
+
+                    dist.all_reduce(coalesced, group=self.data_parallel_group) # important TODO
+
                     torch.cuda.synchronize()
                     if not no_scale and reduce_after:
                         coalesced /= dist.get_world_size(group=self.data_parallel_group)
@@ -82,7 +90,7 @@ class DistributedDataParallel(MegatronModule):
        #     d = handle.hooks_dict_ref()
        #     d[handle.id] = hook
 
-        return sd
+        return sd # sd = state dict = a python dictionary object that maps each layer to its parameter tensor
 
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',
                                        keep_vars=False):
@@ -91,6 +99,7 @@ class DistributedDataParallel(MegatronModule):
 
     def load_state_dict(self, state_dict, strict=True):
         self.module.load_state_dict(state_dict, strict=strict)
+        # strict = False, to ignore non-matching keys
 
     '''
     def _sync_buffers(self):

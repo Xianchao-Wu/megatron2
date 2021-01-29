@@ -29,7 +29,7 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 # x * 0.5 * (1.0 + torch.erf(x * 0.70710678))
 
 @torch.jit.script
-def bias_gelu(bias, y):
+def bias_gelu(bias, y): # forward
     x = bias + y
     return  x * 0.5 * (1.0 + torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
     # 这里使用的是原始gelu函数的定义：
@@ -40,7 +40,7 @@ def bias_gelu(bias, y):
 # gradient of actual gelu (gelu的梯度) is:
 # 0.5 * (1. + torch.erf(x * 0.70710678)) + 0.3989423 * x * torch.exp(-0.5 * x * x)
 @torch.jit.script
-def bias_gelu_back(g, bias, y):
+def bias_gelu_back(g, bias, y): # gradient for backward
     x = bias + y
     tanh_out = torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x))
     # sqrt(2/pi) * 3 * 0.044715 -> 0.1070322243

@@ -38,13 +38,13 @@ class FusedLayerNormAffineFunction(torch.autograd.Function): # 融合的LayerNor
   def forward(ctx, input, weight, bias, normalized_shape, eps):
     global fused_mix_prec_layer_norm_cuda
     if fused_mix_prec_layer_norm_cuda is None:
-        fused_mix_prec_layer_norm_cuda = importlib.import_module("fused_mix_prec_layer_norm_cuda")
+        fused_mix_prec_layer_norm_cuda = importlib.import_module("fused_mix_prec_layer_norm_cuda") # TODO 来自哪里？
     ctx.normalized_shape = normalized_shape
     ctx.eps = eps
     input_ = input.contiguous()
     weight_ = weight.contiguous()
     bias_ = bias.contiguous()
-    output, mean, invvar = fused_mix_prec_layer_norm_cuda.forward_affine(
+    output, mean, invvar = fused_mix_prec_layer_norm_cuda.forward_affine( # TODO API如何使用？
         input_, ctx.normalized_shape, weight_, bias_, ctx.eps)
     ctx.save_for_backward(input_, weight_, bias_, mean, invvar) # 保存
     return output
@@ -53,7 +53,7 @@ class FusedLayerNormAffineFunction(torch.autograd.Function): # 融合的LayerNor
   def backward(ctx, grad_output):
     input_, weight_, bias_, mean, invvar = ctx.saved_tensors # 取出在forward的时候保存的五个parameters
     grad_input = grad_weight = grad_bias = None
-    grad_input, grad_weight, grad_bias = fused_mix_prec_layer_norm_cuda.backward_affine(
+    grad_input, grad_weight, grad_bias = fused_mix_prec_layer_norm_cuda.backward_affine( # TODO
         grad_output.contiguous(), mean, invvar,
         input_, ctx.normalized_shape,
         weight_, bias_, ctx.eps)
@@ -65,7 +65,7 @@ class FusedLayerNormFunction(torch.autograd.Function):
   def forward(ctx, input, normalized_shape, eps):
     global fused_layer_norm_cuda
     if fused_layer_norm_cuda is None:
-        fused_layer_norm_cuda = importlib.import_module("fused_layer_norm_cuda")
+        fused_layer_norm_cuda = importlib.import_module("fused_layer_norm_cuda") # TODO 来自哪里
     ctx.normalized_shape = normalized_shape
     ctx.eps = eps
     input_ = input.contiguous()
@@ -79,7 +79,7 @@ class FusedLayerNormFunction(torch.autograd.Function):
     input_, mean, invvar = ctx.saved_tensors # 取出在forward的时候保存的三个parameters
     grad_input = None
     grad_input = fused_layer_norm_cuda.backward(
-        grad_output.contiguous(), mean, invvar,
+        grad_output.contiguous(), mean, invvar, # invvar = inverse variance?
         input_, ctx.normalized_shape,
         ctx.eps)
     return grad_input, None, None
@@ -99,7 +99,7 @@ class MixedFusedLayerNorm(torch.nn.Module):
     The mean and standard-deviation are calculated separately over the last
     certain number dimensions which have to be of the shape specified by
     :attr:`normalized_shape`.
-    :math:`\gamma` and :math:`\beta` are learnable affine transform parameters of
+    :math:`\gamma` and :math:`\beta` are learnable affine transform parameters (可学习的仿射变换参数) of
     :attr:`normalized_shape` if :attr:`elementwise_affine` is ``True``.
     .. note::
         Unlike Batch Normalization and Instance Normalization, which applies
@@ -127,12 +127,16 @@ class MixedFusedLayerNorm(torch.nn.Module):
         >>> input = torch.randn(20, 5, 10, 10)
         >>> # With Learnable Parameters
         >>> m = apex.normalization.FusedLayerNorm(input.size()[1:])
+
         >>> # Without Learnable Parameters
         >>> m = apex.normalization.FusedLayerNorm(input.size()[1:], elementwise_affine=False)
+
         >>> # Normalize over last two dimensions
         >>> m = apex.normalization.FusedLayerNorm([10, 10])
+
         >>> # Normalize over last dimension of size 10
         >>> m = apex.normalization.FusedLayerNorm(10)
+
         >>> # Activating the module
         >>> output = m(input)
     .. _`Layer Normalization`: https://arxiv.org/abs/1607.06450
@@ -161,8 +165,8 @@ class MixedFusedLayerNorm(torch.nn.Module):
 
     def reset_parameters(self):
         if self.elementwise_affine:
-            init.ones_(self.weight)
-            init.zeros_(self.bias)
+            init.ones_(self.weight) # torch.nn.init.ones_ : fills the input tensor with the scalar value 1
+            init.zeros_(self.bias) # torch.nn.init.zeros_ : fills the input tensor with the scalar value 0
 
     def forward(self, input):
         if not input.is_cuda: # True if the tensor is stored on the GPU; False otherwise
