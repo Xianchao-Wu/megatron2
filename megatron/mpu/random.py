@@ -126,9 +126,9 @@ def gather_split_1d_tensor(tensor):
 
 
 class CudaRNGStatesTracker:
-    """Tracker for the cuda RNG states.
+    """Tracker for the cuda RNG=Random-Number-Generator states.
 
-    Using the `add` method, a cuda rng state is initialized based on
+    Using the `add` method, a cuda rng (random-number-generator) state is initialized based on
     the input `seed` and is assigned to `name`. Later, by forking the
     rng state, we can perform operations and return to our starting
     cuda state.
@@ -212,7 +212,7 @@ def model_parallel_cuda_manual_seed(seed):
     initialized. Also, no torch.cuda.manual_seed should be called
     after this function. Basically, this is replacement for that
     function.
-    Two set of RNG states are tracked:
+    Two set of RNG (= random number generator) states are tracked:
         default state: This is for data parallelism and is the same among a
                        set of model parallel GPUs but different across
                        different model paralle groups. This is used for

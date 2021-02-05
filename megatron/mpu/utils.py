@@ -47,6 +47,7 @@ def split_tensor_along_last_dim(tensor, num_partitions,
     # Split.
     tensor_list = torch.split(tensor, last_dim_size, dim=last_dim)
     # Note: torch.split does not create contiguous tensors by default.
+    # 所以，在调用本方法之后，有可能需要再次调用contiguous()方法！
     if contiguous_split_chunks:
         return tuple(chunk.contiguous() for chunk in tensor_list)
 

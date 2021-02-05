@@ -25,12 +25,12 @@ import torch.nn.functional as F
 import torch.nn.init as init
 from torch.nn.parameter import Parameter
 
-from .initialize import get_tensor_model_parallel_rank
-from .initialize import get_tensor_model_parallel_world_size
-from .mappings import copy_to_tensor_model_parallel_region
-from .mappings import gather_from_tensor_model_parallel_region
-from .mappings import reduce_from_tensor_model_parallel_region
-from .mappings import scatter_to_tensor_model_parallel_region
+from .initialize import get_tensor_model_parallel_rank # """Return my rank for the tensor model parallel group.""" 并行群组中的当前gpu的rank
+from .initialize import get_tensor_model_parallel_world_size # """Return world size for the tensor model parallel group.""" 并行群组中的gpu的数量
+from .mappings import copy_to_tensor_model_parallel_region # “复制-全归约”
+from .mappings import gather_from_tensor_model_parallel_region # “拼凑-切割”
+from .mappings import reduce_from_tensor_model_parallel_region # “全归约-复制”
+from .mappings import scatter_to_tensor_model_parallel_region # "切割-拼凑"
 from .random import get_cuda_rng_tracker
 from .utils import divide
 from .utils import split_tensor_along_last_dim
@@ -46,11 +46,11 @@ _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {'tensor_model_parallel': False,
 def set_tensor_model_parallel_attributes(tensor, is_parallel, dim, stride):
     # Make sure the attributes are not set.
     for attribute in _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS:
-        assert not hasattr(tensor, attribute)
+        assert not hasattr(tensor, attribute) # python内置函数，用于判断对象是否包含对应的属性
     # Set the attributes.
-    setattr(tensor, 'tensor_model_parallel', is_parallel)
+    setattr(tensor, 'tensor_model_parallel', is_parallel) # python自带的函数，用于设置属性值，该属性不一定是存在的！
     setattr(tensor, 'partition_dim', dim)
-    setattr(tensor, 'partition_stride', stride)
+    setattr(tensor, 'partition_stride', stride) # 步幅
 
 
 def set_defaults_if_not_set_tensor_model_parallel_attributes(tensor):
@@ -58,12 +58,13 @@ def set_defaults_if_not_set_tensor_model_parallel_attributes(tensor):
         if not hasattr(tensor, attribute):
             setattr(tensor, attribute, value)
     for attribute in _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS:
-        maybe_set(attribute, _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS[attribute])
+        maybe_set(attribute, _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS[attribute]) # 只有当tensor没有一个属性
+        #的时候，才赋值缺省值； "tensor_model_parallel", "partition_dim", and "partition_stride".
 
 
 def copy_tensor_model_parallel_attributes(destination_tensor, source_tensor):
     def maybe_copy(attribute):
-        if hasattr(source_tensor, attribute):
+        if hasattr(source_tensor, attribute): # 只有当source_tensor中有属性的时候，才进行复制
             setattr(destination_tensor, attribute,
                     getattr(source_tensor, attribute))
     for attribute in _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS:
@@ -79,7 +80,7 @@ def _initialize_affine_weight_gpu(weight, init_method,
                                          dim=partition_dim,
                                          stride=stride)
 
-    with get_cuda_rng_tracker().fork():
+    with get_cuda_rng_tracker().fork(): # rng = random number generator
         init_method(weight)
 
 
@@ -110,7 +111,7 @@ def _initialize_affine_weight_cpu(weight, output_size, input_size,
     weight_list = torch.split(master_weight, per_partition_per_stride_size,
                               dim=partition_dim)
     rank = get_model_parallel_rank()
-    world_size = get_tensor_model_parallel_world_size()
+    world_size = get_tensor_model_parallel_world_size() # 当前的gpu所在的并行群组中的gpu的数量
     my_weight_list = weight_list[rank::world_size]
 
     with torch.no_grad():
@@ -144,11 +145,11 @@ class VocabParallelEmbedding(torch.nn.Module):
         self.scale_grad_by_freq = False
         self.sparse = False
         self._weight = None
-        self.tensor_model_parallel_size = get_tensor_model_parallel_world_size()
+        self.tensor_model_parallel_size = get_tensor_model_parallel_world_size() # 当前gpu所在的并行群组中gpu的数量
         # Divide the weight matrix along the vocaburaly dimension.
         self.vocab_start_index, self.vocab_end_index = \
-            VocabUtility.vocab_range_from_global_vocab_size(
-                self.num_embeddings, get_tensor_model_parallel_rank(),
+            VocabUtility.vocab_range_from_global_vocab_size( # 当前rank的gpu所覆盖的子词表index: [index_first, index_last)
+                self.num_embeddings, get_tensor_model_parallel_rank(), # 当前gpu在其所在的并行群组中的rank
                 self.tensor_model_parallel_size)
         self.num_embeddings_per_partition = self.vocab_end_index - \
             self.vocab_start_index
@@ -156,7 +157,7 @@ class VocabParallelEmbedding(torch.nn.Module):
         # Allocate weights and initialize.
         args = get_args()
         if args.use_cpu_initialization:
-            self.weight = Parameter(torch.empty(
+            self.weight = Parameter(torch.empty( # from torch.nn.parameter import Parameter
                 self.num_embeddings_per_partition, self.embedding_dim,
                 dtype=args.params_dtype))
             _initialize_affine_weight_cpu(
@@ -175,7 +176,7 @@ class VocabParallelEmbedding(torch.nn.Module):
             input_mask = (input_ < self.vocab_start_index) | \
                          (input_ >= self.vocab_end_index)
             # Mask the input.
-            masked_input = input_.clone() - self.vocab_start_index
+            masked_input = input_.clone() - self.vocab_start_index # TODO 为什么这里要-self.vocab_start_index?
             masked_input[input_mask] = 0
         else:
             masked_input = input_
@@ -188,31 +189,37 @@ class VocabParallelEmbedding(torch.nn.Module):
         if self.tensor_model_parallel_size > 1:
             output_parallel[input_mask, :] = 0.0
         # Reduce across all the model parallel GPUs.
-        output = reduce_from_tensor_model_parallel_region(output_parallel)
+        output = reduce_from_tensor_model_parallel_region(output_parallel) # 前向全归约，后向复制
         return output
 
 
 class ColumnParallelLinear(torch.nn.Module):
     """Linear layer with column parallelism.
 
-    The linear layer is defined as Y = XA + b. A is parallelized along
-    its second dimension as A = [A_1, ..., A_p].
+    The linear layer is defined as Y = XA + b. Here, A is parallelized along
+    its second dimension (A is a matrix) as A = [A_1, ..., A_p].
+
+    解释：A是矩阵，从h维度，变换到4h维度. 相当于说上面公式中的X的最后一个维度是h，A是h*4h的矩阵
+    而在代码中，是A按照h*(4h/p)的方式被并行化的：即所谓的A按照其第二个维度来被并行化！
 
     Arguments:
-        input_size: first dimension of matrix A.
-        output_size: second dimension of matrix A.
+        input_size: first dimension of matrix A. [参数A的整体的行数] cx
+        output_size: second dimension of matrix A. [参数A的整体的列数] ca
         bias: If true, add bias
-        gather_output: If true, call all-gether/all-gather on output and make Y avaiable
+        gather_output: If true, call all-gather on output and make Y avaiable
                        to all GPUs, otherwise, every GPU will have its output
-                       which is Y_i = XA_i
+                       which is Y_i = XA_i (注意输入X，不切割！）[rx, cx] * [cx, cai] -> [rx, cai]
+                       rx=row number of x, cx=column number of x, cai=column number of A_i
+                       这样的话，Y_i (i=1,...,p)的shape就是[rx, cai]
+                       如果要gather的话，应该如何处理？
         init_method: method to initialize weights. Note that bias is always set
                      to zero.
         stride: For the strided linear layers.
         keep_master_weight_for_test: This was added for testing and should be
                                      set to False. It returns the master weights
-                                     used for initialization.
+                                     used for initialization. [TODO] 何意?
         skip_bias_add: This was added to enable performance optimations where bias
-                       can be fused with other elementwise operations. we skip 
+                       can be fused with (打成一片，与...融合) other elementwise operations. we skip 
                        adding bias but instead return it.
     """
 
@@ -223,31 +230,33 @@ class ColumnParallelLinear(torch.nn.Module):
         super(ColumnParallelLinear, self).__init__()
 
         # Keep input parameters
-        self.input_size = input_size
-        self.output_size = output_size
-        self.gather_output = gather_output
+        self.input_size = input_size # h=hidden_size of transformer
+        self.output_size = output_size # 4*h
+        self.gather_output = gather_output # True or False
         # Divide the weight matrix along the last dimension.
-        world_size = get_tensor_model_parallel_world_size()
-        self.output_size_per_partition = divide(output_size, world_size)
+        world_size = get_tensor_model_parallel_world_size() # 当前并行群组中gpu的个数
+        self.output_size_per_partition = divide(output_size, world_size) # 每个“划分”上的output的维度大小, 4h/p
+        # 即，对A的列的个数，按照gpu的数量，进行切分，然后得到的就是，每个gpu上的列的个数
+
         self.skip_bias_add = skip_bias_add
 
         # Parameters.
         # Note: torch.nn.functional.linear performs XA^T + b and as a result
-        # we allocate the transpose.
+        # we allocate the transpose. 注意，如下的weight，是定义的A_i^T
         # Initialize weight.
         args = get_args()
-        if args.use_cpu_initialization:
-            self.weight = Parameter(torch.empty(self.output_size_per_partition,
-                                                self.input_size,
-                                                dtype=args.params_dtype))
+        if args.use_cpu_initialization: # args中是"--use-cpu-initialization" (使用CPU初始化参数的值)
+            self.weight = Parameter(torch.empty(self.output_size_per_partition, # cai = column of A_i=row of A_i^T = 4h/p
+                                                self.input_size, # rx=row of A/X=column of X^T = h
+                                                dtype=args.params_dtype)) # float32 or float16
             self.master_weight = _initialize_affine_weight_cpu(
                 self.weight, self.output_size, self.input_size,
                 self.output_size_per_partition, 0, init_method,
                 stride=stride, return_master_weight=keep_master_weight_for_test)
         else:
             self.weight = Parameter(torch.empty(
-                self.output_size_per_partition, self.input_size,
-                device=torch.cuda.current_device(), dtype=args.params_dtype))
+                self.output_size_per_partition, self.input_size, # cai=column of A_i=row of A_i^T=4h/p, rx=row of A=column of A^T=h
+                device=torch.cuda.current_device(), dtype=args.params_dtype)) # device=当前的GPU
             _initialize_affine_weight_gpu(self.weight, init_method,
                                           partition_dim=0, stride=stride)
             
@@ -258,7 +267,7 @@ class ColumnParallelLinear(torch.nn.Module):
             else:
                 self.bias = Parameter(torch.empty(
                     self.output_size_per_partition,
-                    device=torch.cuda.current_device(),
+                    device=torch.cuda.current_device(), # device=当前的gpu
                     dtype=args.params_dtype))
             self.bias.tensor_model_parallel = True
             self.bias.partition_dim = 0
@@ -270,17 +279,22 @@ class ColumnParallelLinear(torch.nn.Module):
             self.register_parameter('bias', None)
 
 
-
     def forward(self, input_):
         # Set up backprop all-reduce.
-        input_parallel = copy_to_tensor_model_parallel_region(input_)
+        input_parallel = copy_to_tensor_model_parallel_region(input_) # 前向复制，后向全归约（论文中的Figure 3.a中的f）
+        # 原因：X在多个GPU上被简单复制（没有进行任何切割），类似X -> f -> [X, X, ..., X]
+        # 这样的话，反向的时候，就是多个gpu上的X的整体，通过all_reduce合并到一起（例如相加然后平均，或者直接element-wise相加）
         # Matrix multiply.
 
-        bias = self.bias if not self.skip_bias_add else None
-        output_parallel = F.linear(input_parallel, self.weight, bias)
+        bias = self.bias if not self.skip_bias_add else None # 当不“忽略bias”的时候，带上self.bias
+        output_parallel = F.linear(input_parallel, self.weight, bias) # import torch.nn.functional as F
+        # X * A_i^T = (b, s, h) * (h, 4h/p) = (b, s, 4h/p) = output_parallel
+
         if self.gather_output:
             # All-gather across the partitions.
-            output = gather_from_tensor_model_parallel_region(output_parallel)
+            output = gather_from_tensor_model_parallel_region(output_parallel) # 前向拼凑，后向切割
+            # 前向把各个GPU上的Y_i，进行拼凑，得到Y；即，从(b, s, 4h/p)拼凑到(b, s, 4h)的过程。
+            # 后向的时候，把Y按照GPU的数量，进行切割，并送回到各个GPU。即，从(b, s, 4h)切割到(b, s, 4h/p)的过程。
         else:
             output = output_parallel 
         output_bias = self.bias if self.skip_bias_add else None
@@ -288,27 +302,27 @@ class ColumnParallelLinear(torch.nn.Module):
 
 
 class RowParallelLinear(torch.nn.Module):
-    """Linear layer with row parallelism.
+    """Linear layer with row parallelism (参数按照行，切分并行).
 
-    The linear layer is defined as Y = XA + b. A is parallelized along
-    its first dimension and X along its second dimension as:
+    The linear layer is defined as Y = XA + b （X=输入tensor, A=可训练参数, b=bias；Y=输出tensor）. 
+    A is parallelized along its first dimension and X along its second (final, possibly not second!!!) dimension as:
                -   -
               | A_1 |
               | .   |
-          A = | .   |        X = [X_1, ..., X_p]
+          A = | .   |        X = [X_1, ..., X_p] (按照最后一列切割的)
               | .   |
               | A_p |
                -   -
     Arguments:
-        input_size: first dimension of matrix A.
-        output_size: second dimension of matrix A.
+        input_size: first dimension of matrix A. [A的行数] 4h
+        output_size: second dimension of matrix A. [A的列数] h
         bias: If true, add bias. Note that bias is not parallelized.
         input_is_parallel: If true, we assume that the input is already
                            split across the GPUs and we do not split
-                           again.
+                           again. [输入已经按照GPUs进行切割完毕了，不再次切割]
         init_method: method to initialize weights. Note that bias is always set
                      to zero.
-        stride: For the strided linear layers.
+        stride: For the strided linear layers (? stride=1含义? TODO).
         keep_master_weight_for_test: This was added for testing and should be
                                      set to False. It returns the master weights
                                      used for initialization.
@@ -325,12 +339,12 @@ class RowParallelLinear(torch.nn.Module):
         super(RowParallelLinear, self).__init__()
 
         # Keep input parameters
-        self.input_size = input_size
-        self.output_size = output_size
+        self.input_size = input_size # 例如，4*hidden_size of transformer = 4*h
+        self.output_size = output_size # 例如，hidden_size of transformer = h
         self.input_is_parallel = input_is_parallel
         # Divide the weight matrix along the last dimension.
-        world_size = get_tensor_model_parallel_world_size()
-        self.input_size_per_partition = divide(input_size, world_size)
+        world_size = get_tensor_model_parallel_world_size() # 当前并行群组中gpu的数量
+        self.input_size_per_partition = divide(input_size, world_size) # 类似于从A到A_1, A_2, ..., A_p; 这里是从4h到4h/p
         self.skip_bias_add = skip_bias_add
 
         # Parameters.
@@ -339,22 +353,24 @@ class RowParallelLinear(torch.nn.Module):
         # Initialize weight.
         args = get_args()
         if args.use_cpu_initialization:
-            self.weight = Parameter(torch.empty(self.output_size,
-                                                self.input_size_per_partition,
+            # Parameter：将一个不可训练的类型tensor转换成可以训练的类型parameter
+            # 并将这个parameter绑定到这个module里面，相当于变成了模型的一部分，成为了模型中可以根据训练进行变化的参数！
+            self.weight = Parameter(torch.empty(self.output_size, # h
+                                                self.input_size_per_partition, # 对输入，按照“划分”的个数进行了“切割” 4h/p
                                                 dtype=args.params_dtype))
             self.master_weight = _initialize_affine_weight_cpu(
                 self.weight, self.output_size, self.input_size,
                 self.input_size_per_partition, 1, init_method,
-                stride=stride, return_master_weight=keep_master_weight_for_test)
+                stride=stride, return_master_weight=keep_master_weight_for_test) # forward中没有用到此参数！
         else:
             self.weight = Parameter(torch.empty(
-                self.output_size, self.input_size_per_partition,
+                self.output_size, self.input_size_per_partition, # output_size=h, input_size_per_partition=4h/p
                 device=torch.cuda.current_device(), dtype=args.params_dtype))
             _initialize_affine_weight_gpu(self.weight, init_method,
                                           partition_dim=1, stride=stride)
         if bias:
             if args.use_cpu_initialization:
-                self.bias = Parameter(torch.empty(self.output_size,
+                self.bias = Parameter(torch.empty(self.output_size, # h, for bias
                                                   dtype=args.params_dtype))
             else:
                 self.bias = Parameter(torch.empty(
@@ -362,10 +378,10 @@ class RowParallelLinear(torch.nn.Module):
                     dtype=args.params_dtype))
             # Always initialize bias to zero.
             with torch.no_grad():
-                self.bias.zero_()
+                self.bias.zero_() # in place method
         else:
             self.register_parameter('bias', None)
-
+            # 向我们建立的网络module添加parameter!
 
 
     def forward(self, input_):
@@ -373,15 +389,25 @@ class RowParallelLinear(torch.nn.Module):
         if self.input_is_parallel:
             input_parallel = input_
         else:
-            input_parallel = scatter_to_tensor_model_parallel_region(input_)
-        # Matrix multiply.
-        output_parallel = F.linear(input_parallel, self.weight)
-        # All-reduce across all the partitions.
-        output_ = reduce_from_tensor_model_parallel_region(output_parallel)
-        if not self.skip_bias_add:
-            output = output_ + self.bias if self.bias is not None else output_
+            input_parallel = scatter_to_tensor_model_parallel_region(input_) # 前向切割，后向拼凑
+            # 如果有必要，先把输入inputs_=X按照?（应该是最后一列，即4h -> 4h/p）切割，按照gpu的数量。得到的是X_1, ..., X_p这样的，shape是?
+            # (batch, seq, 4*hidden/p) 或者(seq, batch, 4*hidden/p)
+
+        # Matrix multiply. [Y1*B1] to [Yi*Bi] in Figure 3(a):
+        output_parallel = F.linear(input_parallel, self.weight) # 注意，输入是X_i，而且经历的weight是A_i
+        # 从4h/p -> h的linear (是对tensor的最后一列进行变换的！至于mini-batch方面，则是data-parallel的问题，这里不考虑！)
+        # 相当于从X_i=(b, s, 4h/p) * A_i^T=(4h/p, h) -> (b, s, h)这样的结果。
+        # 可以看到X按照最后一个维度被切割成了p份（gpu的数量); 
+        # 然后经过线性层，从4h/p维度，被映射成了h维度。所以，最后的输出是(b, s, h).
+
+        # All-reduce across all the partitions. [g function in Figure 3(a)]
+        output_ = reduce_from_tensor_model_parallel_region(output_parallel) # 前向全归约，后向复制(Figure 3(a) right-hand-side)
+        # 对每个gpu上的(b, s, h)进行all_reduce，叠加（求平均），然后得到的是(b, s, h)，每个gpu上面都保持了最新的结果。
+
+        if not self.skip_bias_add: # add:
+            output = output_ + self.bias if self.bias is not None else output_ # 把bias加到output_上
             output_bias = None
-        else:
+        else: # not add:
             output = output_
             output_bias = self.bias
         return output, output_bias

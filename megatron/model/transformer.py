@@ -35,22 +35,22 @@ torch._C._jit_override_can_fuse_on_cpu(True)
 torch._C._jit_override_can_fuse_on_gpu(True)
 
 """ We use the following notation throughout this file:
-     h: hidden size
-     n: number of attention heads
-     p: number of model parallel partitions
-     np: n/p
-     hp: h/p
-     hn: h/n
-     b: batch size
-     s: sequence length
-     l: number of layers
-    Transformer takes input of size [s, b, h] and returns a
+     h: hidden size [隐层维度]
+     n: number of attention heads [注意力头的个数]
+     p: number of model parallel partitions [模型并行的“划分”的个数]
+     np: n/p [注意力头的个数/“模型并行”的划分数, 结果np表示的就是一个“划分”上可以有几个"注意力头"]
+     hp: h/p [隐层维度/“模型并行”的划分数，hp表示的是一个“划分”上可以有多少hidden size dimension]
+     hn: h/n [隐层维度/注意力头的个数=每个注意力头可以对应多少隐层维度，或者，一个head被表示成多少维度]
+     b: batch size [批处理size]
+     s: sequence length [序列长度]
+     l: number of layers [层数 blocks? multi-head self-attention + point-wise feed-forward network?]
+    Transformer takes input of size [s, b, h] (序列长度, 批大小, 隐层维度) and returns a
     tensor of the same size. We use the following arguments:
         hyperparameters: transformer hyperparameters
         attention_mask_func: a function that takes `unmaksed-attention-scores`
-            with size [b, np, s, s] and an `attention-mask` and will apply
+            with size [b, np, s, s] (批大小，一个划分上注意力头的个数，序列长度，序列长度) and an `attention-mask` and will apply
             the masking. The function should return a masked score of the
-            same size [b, np, s, s].
+            same size [b, np, s, s]（批大小，一个划分上注意力头的个数，序列长度，序列长度）.
                masked-attention-scores = attention_mask_func(
                                      unmaksed-attention-scores, attention-mask)
 """
@@ -62,6 +62,7 @@ class ParallelMLP(MegatronModule):
     hidden dimension, perform nonlinear transformation, and project the
     state back into h hidden dimension. At the end, dropout is also
     applied.
+    参考论文中的Figure 3(a)
     """
 
     def __init__(self, init_method, output_layer_init_method):
@@ -70,9 +71,9 @@ class ParallelMLP(MegatronModule):
 
         # [first linear layer] Project to 4h: (alike position-wise feed-forward layer in transformer)
         self.dense_h_to_4h = mpu.ColumnParallelLinear( # TODO use mpu's 列并行-linear-layer
-            args.hidden_size, # input.size
-            4 * args.hidden_size, # output.size
-            gather_output=False,
+            args.hidden_size, # input.size，最大的隐层维度（按照gpu个数分割前的）= Transformer hidden size
+            4 * args.hidden_size, # output.size, 4*最大的隐层维度 = 4 * "Transformer hidden size"
+            gather_output=False, # TODO why not True?
             init_method=init_method, # 初始化方法
             skip_bias_add=True)
 
@@ -85,8 +86,8 @@ class ParallelMLP(MegatronModule):
 
         # [second linear layer] Project back to h.
         self.dense_4h_to_h = mpu.RowParallelLinear( # TODO use mpu's 行并行-linear-layer
-            4 * args.hidden_size,
-            args.hidden_size,
+            4 * args.hidden_size, # 4 * "Transformer hidden size" 最大的隐层维度
+            args.hidden_size, # 最大的隐层维度, 'Transformer hidden size'
             input_is_parallel=True,
             init_method=output_layer_init_method, # 输出层的初始化方法
             skip_bias_add=True)
@@ -94,7 +95,8 @@ class ParallelMLP(MegatronModule):
 
     def forward(self, hidden_states):
 
-        # [s, b, 4hp]
+        # [s, b, 4hp] (序列长度，批大小，4*一个划分上的隐层维度hp)? TODO
+        # 这里应该是一个整体的隐层维度大小（所有gpu的整体）[s, b, 4*h]
         intermediate_parallel, bias_parallel = self.dense_h_to_4h(hidden_states)
 
         if self.bias_gelu_fusion:
@@ -104,7 +106,8 @@ class ParallelMLP(MegatronModule):
             intermediate_parallel = \
                 self.activation_func(intermediate_parallel + bias_parallel)
 
-        # [s, b, h]
+        # [s, b, h] (序列长度，皮大小，隐层整体维度？！居然不是hp? TODO) -> 应该不是hp; 应该是4h -> h
+        # RowParallelLinear : 负责对整体的hidden size，按照gpu进行切割处理
         output, output_bias = self.dense_4h_to_h(intermediate_parallel)
         return output, output_bias
 
@@ -123,7 +126,7 @@ class ParallelSelfAttention(MegatronModule):
         self.fp16 = args.fp16
 
         self.attention_mask_func = attention_mask_func
-        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling
+        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling # apply (or not) scale Q * K^T by 1 / layer-number
         self.attention_softmax_in_fp32 = args.attention_softmax_in_fp32
         if self.apply_query_key_layer_scaling:
             self.attention_softmax_in_fp32 = True
@@ -131,7 +134,7 @@ class ParallelSelfAttention(MegatronModule):
 
         # Per attention head and per partition values.
         world_size = mpu.get_tensor_model_parallel_world_size()
-        self.hidden_size_per_partition = mpu.divide(args.hidden_size,
+        self.hidden_size_per_partition = mpu.divide(args.hidden_size, # transformer hidden size; 每个gpu划分的隐层维度大小
                                                     world_size)
         self.hidden_size_per_attention_head = mpu.divide(
             args.hidden_size, args.num_attention_heads)
