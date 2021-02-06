@@ -73,7 +73,7 @@ class ParallelMLP(MegatronModule):
         self.dense_h_to_4h = mpu.ColumnParallelLinear( # TODO use mpu's 列并行-linear-layer
             args.hidden_size, # input.size，最大的隐层维度（按照gpu个数分割前的）= Transformer hidden size
             4 * args.hidden_size, # output.size, 4*最大的隐层维度 = 4 * "Transformer hidden size"
-            gather_output=False, # TODO why not True?
+            gather_output=False, # TODO why not True? 不需要gather, 即不需要对XA1, ..., XAp进行“前向拼接，后向切割”处理！
             init_method=init_method, # 初始化方法
             skip_bias_add=True)
 
@@ -135,21 +135,21 @@ class ParallelSelfAttention(MegatronModule):
         # Per attention head and per partition values.
         world_size = mpu.get_tensor_model_parallel_world_size()
         self.hidden_size_per_partition = mpu.divide(args.hidden_size, # transformer hidden size; 每个gpu划分的隐层维度大小
-                                                    world_size)
+                                                    world_size) # h/p
         self.hidden_size_per_attention_head = mpu.divide(
-            args.hidden_size, args.num_attention_heads)
+            args.hidden_size, args.num_attention_heads) # h/n
         self.num_attention_heads_per_partition = mpu.divide(
-            args.num_attention_heads, world_size)
+            args.num_attention_heads, world_size) # n/p
 
         # Strided linear layer.
-        self.query_key_value = mpu.ColumnParallelLinear(
-            args.hidden_size,
-            3 * args.hidden_size,
+        self.query_key_value = mpu.ColumnParallelLinear( # alike q'=Qq, k'=Kk, and v'=Vv
+            args.hidden_size, # h
+            3 * args.hidden_size, # 3h
             gather_output=False,
-            init_method=init_method)
+            init_method=init_method) # h->3h的列并行Linear网络（细节可以参考ParallelMLP中的h->4h的情况）
 
         coeff = None # 系数 coefficient
-        self.norm_factor = math.sqrt(self.hidden_size_per_attention_head)
+        self.norm_factor = math.sqrt(self.hidden_size_per_attention_head) # sqrt(h/n)
         if self.apply_query_key_layer_scaling:
             coeff = self.layer_number
             self.norm_factor *= coeff
@@ -173,9 +173,12 @@ class ParallelSelfAttention(MegatronModule):
             args.hidden_size,
             input_is_parallel=True,
             init_method=output_layer_init_method,
-            skip_bias_add=True)
+            skip_bias_add=True) # h->h的行并行Linear
 
     def _transpose_last_dim(self, mixed_layer, num_splits, num_splits_first):
+        """ num_splits=3 for q, k, v;
+            num_splits_first=True/False, true for [s,b,num_splits*np*hn] and false for [s,b,np*hn*num_splits]
+        """
         input_shape = mixed_layer.size();
         if num_splits_first:
             """[s, b, num_splits * np * hn] 
@@ -185,10 +188,10 @@ class ParallelSelfAttention(MegatronModule):
 
             intermediate_shape = input_shape[:-1] +\
                 (num_splits, self.num_attention_heads_per_partition,
-                 self.hidden_size_per_attention_head)
+                 self.hidden_size_per_attention_head) # 后面三个维度分别是(num_splits=3, np, hn)
 
-            mixed_layer = mixed_layer.view(*intermediate_shape)
-            mixed_layer = mixed_layer.transpose(-2, -3).contiguous()
+            mixed_layer = mixed_layer.view(*intermediate_shape) # (s, b, 3, np, hn)
+            mixed_layer = mixed_layer.transpose(-2, -3).contiguous() # (s, b, np, 3, hn)
         else:
             """[s, b, np * hn * num_splits] 
             -->(view) [s, b, np, hn, num_splits] 
@@ -197,11 +200,13 @@ class ParallelSelfAttention(MegatronModule):
 
             intermediate_shape = input_shape[:-1] +\
                 (self.num_attention_heads_per_partition,
-                 self.hidden_size_per_attention_head, num_splits)
+                 self.hidden_size_per_attention_head, num_splits) # 后面三个维度分别是(np, hn, 3)
 
-            mixed_layer = mixed_layer.view(*intermediate_shape)
-            mixed_layer = mixed_layer.transpose(-1, -2).contiguous()
-        mixed_layer = mixed_layer.view(*input_shape)
+            mixed_layer = mixed_layer.view(*intermediate_shape) # (s, b, np, hn, 3)
+            mixed_layer = mixed_layer.transpose(-1, -2).contiguous() # (s, b, np, 3, hn)
+        mixed_layer = mixed_layer.view(*input_shape) # 这样，无论num_splits_first是True/False，结果
+        # 都一样了，都是(s, b, np*3*hn)
+        # 参照：最初的本方法的输入的时候是(s,b,3*np*hn)，或者(s,b,np*hn*3) --> (s,b,np*3*hn)
         
         return mixed_layer
 

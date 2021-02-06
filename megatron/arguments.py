@@ -343,7 +343,7 @@ def _add_training_args(parser):
                        type=bool,
                        help='Use upper triangular version of fused '
                        'scale, mask, softmax fusion kernel (default for GPT). '
-                       '- DEPRECATED')
+                       '- DEPRECATED') # TODO 废弃了，不过仍然在代码中被使用
     group.add_argument('--no-bias-gelu-fusion', action='store_false', # store_false也就是默认为True，一旦命令中有此参数，其值则变为False。
                        help='Disable bias and gelu fusion.',
                        dest='bias_gelu_fusion') # dest - 被添加到 parse_args() 所返回对象上的属性名
