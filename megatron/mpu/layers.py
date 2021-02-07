@@ -280,7 +280,7 @@ class ColumnParallelLinear(torch.nn.Module):
 
 
     def forward(self, input_):
-        # Set up backprop all-reduce.
+        # Set up backprop all-reduce. 输入的是整体h，输出的是4h/p被按照gpu分割之后的！
         input_parallel = copy_to_tensor_model_parallel_region(input_) # 前向复制，后向全归约（论文中的Figure 3.a中的f）
         # 原因：X在多个GPU上被简单复制（没有进行任何切割），类似X -> f -> [X, X, ..., X]
         # 这样的话，反向的时候，就是多个gpu上的X的整体，通过all_reduce合并到一起（例如相加然后平均，或者直接element-wise相加）
@@ -296,7 +296,8 @@ class ColumnParallelLinear(torch.nn.Module):
             # 前向把各个GPU上的Y_i，进行拼凑，得到Y；即，从(b, s, 4h/p)拼凑到(b, s, 4h)的过程。
             # 后向的时候，把Y按照GPU的数量，进行切割，并送回到各个GPU。即，从(b, s, 4h)切割到(b, s, 4h/p)的过程。
         else:
-            output = output_parallel 
+            output = output_parallel # TODO 注意，如果不gather，则实际在这里输出的是4h/p，是一个gpu上的结果！而不是整体的4h!
+            # 这个部分非常重要，有助于理解selfattention中的每个tensor的维度！
         output_bias = self.bias if self.skip_bias_add else None
         return output, output_bias
 
@@ -385,7 +386,7 @@ class RowParallelLinear(torch.nn.Module):
 
 
     def forward(self, input_):
-        # Set up backprop all-reduce.
+        # Set up backprop all-reduce. 输入的tensor是被分割到每个gpu的，输出的tensor是整体all-reduce之后的！
         if self.input_is_parallel:
             input_parallel = input_
         else:

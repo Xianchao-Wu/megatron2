@@ -126,7 +126,7 @@ class ParallelSelfAttention(MegatronModule):
         self.fp16 = args.fp16
 
         self.attention_mask_func = attention_mask_func
-        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling # apply (or not) scale Q * K^T by 1 / layer-number
+        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling # bool：apply (or not) scale Q * K^T by 1 / layer-number
         self.attention_softmax_in_fp32 = args.attention_softmax_in_fp32
         if self.apply_query_key_layer_scaling:
             self.attention_softmax_in_fp32 = True
@@ -141,7 +141,7 @@ class ParallelSelfAttention(MegatronModule):
         self.num_attention_heads_per_partition = mpu.divide(
             args.num_attention_heads, world_size) # n/p
 
-        # Strided linear layer.
+        # Strided linear layer. (strided何意？TODO)
         self.query_key_value = mpu.ColumnParallelLinear( # alike q'=Qq, k'=Kk, and v'=Vv
             args.hidden_size, # h
             3 * args.hidden_size, # 3h
@@ -169,8 +169,8 @@ class ParallelSelfAttention(MegatronModule):
 
         # Output.
         self.dense = mpu.RowParallelLinear(
-            args.hidden_size,
-            args.hidden_size,
+            args.hidden_size, # h
+            args.hidden_size, # h
             input_is_parallel=True,
             init_method=output_layer_init_method,
             skip_bias_add=True) # h->h的行并行Linear
@@ -178,6 +178,7 @@ class ParallelSelfAttention(MegatronModule):
     def _transpose_last_dim(self, mixed_layer, num_splits, num_splits_first):
         """ num_splits=3 for q, k, v;
             num_splits_first=True/False, true for [s,b,num_splits*np*hn] and false for [s,b,np*hn*num_splits]
+            3 * n/p * h/n = 3h/p, is only for one gpu!
         """
         input_shape = mixed_layer.size();
         if num_splits_first:
@@ -218,8 +219,11 @@ class ParallelSelfAttention(MegatronModule):
         # Query, Key, and Value
         # =====================
 
-        # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
-        mixed_x_layer, _ = self.query_key_value(hidden_states)
+        # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)], np=每个gpu上head的数量, hn=每个head的隐层维度，np*3*hn=3h/p是一个gpu上的！
+        # 不应该在这里的啊！这里的应该是3h作为输出的维度 TODO（这里是“总调度”，不是各个gpu上的并行）
+        # n/p * 3 * h/n = 3h/p finally (is actually for one gpu's hidden dimension!)
+        mixed_x_layer, _ = self.query_key_value(hidden_states) # from h to 3h，这里还是整体的变换
+        # TODO 等待确认，实际输出的是3h/p，也就是说，是一个gpu上的！
 
         checkpoint_version = get_checkpoint_version()
         if checkpoint_version is not None:
@@ -232,14 +236,15 @@ class ParallelSelfAttention(MegatronModule):
 
         # [sq, b, (np * 3 * hn)] --> [sq, b, np, 3 * hn]
         new_tensor_shape = mixed_x_layer.size()[:-1] + \
-            (self.num_attention_heads_per_partition, # 每个划分中的 注意力head 的数量
-             3 * self.hidden_size_per_attention_head) # 每个 attention head的对应的hidden size
+            (self.num_attention_heads_per_partition, # 每个划分中的 注意力head 的数量 = n/p = np
+             3 * self.hidden_size_per_attention_head) # 每个 attention head的对应的hidden size = 3 * h/n = 3 * hn
         mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
 
-        # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
+        # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]， 每个gpu上的head的个数，之后是每个head对应的隐层的维度
+        # 也就是说，head的数量，应该>= GPU的数量！如果head的数量
         (query_layer,
          key_layer,
-         value_layer) = mpu.split_tensor_along_last_dim(mixed_x_layer, 3)
+         value_layer) = mpu.split_tensor_along_last_dim(mixed_x_layer, 3) # 按照最后一列维度，三等分
 
         # ==================================
         # Adjust key and value for inference
@@ -262,8 +267,8 @@ class ParallelSelfAttention(MegatronModule):
         # [b, np, sq, sk]
         output_size = (query_layer.size(1), 
                        query_layer.size(2), 
-                       query_layer.size(0), 
-                       key_layer.size(0))
+                       query_layer.size(0), # sq = sequench length of q
+                       key_layer.size(0)) # sk = sequence length of k
         
         # [sq, b, np, hn] -> [sq, b * np, hn]
         query_layer = query_layer.view(output_size[2],
@@ -282,7 +287,7 @@ class ParallelSelfAttention(MegatronModule):
         # Raw attention scores. [b * np, sq, sk]
         matmul_result = torch.baddbmm(matmul_result, 
             query_layer.transpose(0, 1),   # [b * np, sq, hn]
-            key_layer.transpose(0,1).transpose(1, 2),  #[b * np, hn, sk]
+            key_layer.transpose(0,1).transpose(1, 2),  #[b * np, hn, sk] -> [b * np, sq, sk]
             beta=0.0, alpha=(1.0/self.norm_factor))
 
         # change view to [b, np, sq, sk]
@@ -358,10 +363,12 @@ class ParallelSelfAttention(MegatronModule):
 
 
         # =================
-        # Output. [sq, b, h]
+        # Output. [sq, b, h], sq=sequence length of q, b=batch size, h=hidden size
         # =================
 
-        output, bias = self.dense(context_layer)
+        # 也就是说，这里扔给self.dense的时候的, context_layer是已经被切割之后的了！所以其最后一个维度是hp=h/p，而不是h!
+        output, bias = self.dense(context_layer) # h-> h 的线性映射，RowParallelLinear
+        # 真实情况是h/p作为输入的，大概明白了
 
         if get_key_value:
             output = [output, present]
