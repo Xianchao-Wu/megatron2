@@ -222,8 +222,8 @@ class ParallelSelfAttention(MegatronModule):
         # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)], np=每个gpu上head的数量, hn=每个head的隐层维度，np*3*hn=3h/p是一个gpu上的！
         # 不应该在这里的啊！这里的应该是3h作为输出的维度 TODO（这里是“总调度”，不是各个gpu上的并行）
         # n/p * 3 * h/n = 3h/p finally (is actually for one gpu's hidden dimension!)
-        mixed_x_layer, _ = self.query_key_value(hidden_states) # from h to 3h，这里还是整体的变换
-        # TODO 等待确认，实际输出的是3h/p，也就是说，是一个gpu上的！
+        mixed_x_layer, _ = self.query_key_value(hidden_states) # from h to 3h，这里还是整体的变换（非也，是h -> 3h/p）
+        # TODO 等待确认，实际输出的是3h/p，也就是说，是一个gpu上的！[确认]
 
         checkpoint_version = get_checkpoint_version()
         if checkpoint_version is not None:
@@ -261,7 +261,7 @@ class ParallelSelfAttention(MegatronModule):
 
 
         # ===================================
-        # Raw attention scores. [b, np, s, s]
+        # Raw attention scores. [b, np, s, s] 完成的是Q*K^T的运算！
         # ===================================
         
         # [b, np, sq, sk]
@@ -270,13 +270,13 @@ class ParallelSelfAttention(MegatronModule):
                        query_layer.size(0), # sq = sequench length of q
                        key_layer.size(0)) # sk = sequence length of k
         
-        # [sq, b, np, hn] -> [sq, b * np, hn]
+        # [sq, b, np, hn] -> [sq, b * np, hn] # batch * num_head_per_gpu -> 类似于组成了新的batch!
         query_layer = query_layer.view(output_size[2],
-                                       output_size[0] * output_size[1], -1)
+                                       output_size[0] * output_size[1], -1) # [sq, b*np, hn]
         key_layer = key_layer.view(output_size[3],
-                                   output_size[0] * output_size[1], -1)
+                                   output_size[0] * output_size[1], -1) # [sk, b*np, hn]
 
-        # preallocting result tensor: [b * np, sq, sk]
+        # preallocating result tensor: [b * np, sq, sk]
         matmul_result = torch.empty(
             output_size[0]*output_size[1], 
             output_size[2], 
@@ -284,11 +284,12 @@ class ParallelSelfAttention(MegatronModule):
             dtype=query_layer.dtype, 
             device=torch.cuda.current_device())
 
-        # Raw attention scores. [b * np, sq, sk]
+        # Raw attention scores. matmul_result's shape=[b*np, sq, sk]
         matmul_result = torch.baddbmm(matmul_result, 
-            query_layer.transpose(0, 1),   # [b * np, sq, hn]
-            key_layer.transpose(0,1).transpose(1, 2),  #[b * np, hn, sk] -> [b * np, sq, sk]
+            query_layer.transpose(0, 1),   # from [sq, b*np, hn] to [b*np, sq, hn]
+            key_layer.transpose(0,1).transpose(1, 2),  # from [sk, b*np, hn] to [b*np, sk, hn] and to  [b*np, hn, sk]
             beta=0.0, alpha=(1.0/self.norm_factor))
+        # 得到的结果是: [b*np, sq, hn] * [b*np, hn, sk] -> [b*np, sq, sk]
 
         # change view to [b, np, sq, sk]
         attention_scores = matmul_result.view(*output_size)
@@ -323,7 +324,7 @@ class ParallelSelfAttention(MegatronModule):
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         with mpu.get_cuda_rng_tracker().fork():
-            attention_probs = self.attention_dropout(attention_probs)
+            attention_probs = self.attention_dropout(attention_probs) # TODO where? to confirm?
 
 
         # =========================
@@ -348,7 +349,8 @@ class ParallelSelfAttention(MegatronModule):
                                                output_size[2], -1)
         
         # matmul: [b * np, sq, hn]
-        context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1))
+        context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1)) # TODO important , X*V^T
+        # where X = softmax(Q*K^T/scalar_for_scale)
 
         # change view [b, np, sq, hn]
         context_layer = context_layer.view(*output_size)

@@ -31,7 +31,7 @@ from .mappings import copy_to_tensor_model_parallel_region # “复制-全归约
 from .mappings import gather_from_tensor_model_parallel_region # “拼凑-切割”
 from .mappings import reduce_from_tensor_model_parallel_region # “全归约-复制”
 from .mappings import scatter_to_tensor_model_parallel_region # "切割-拼凑"
-from .random import get_cuda_rng_tracker
+from .random import get_cuda_rng_tracker # rng=random number generator 跟踪仪
 from .utils import divide
 from .utils import split_tensor_along_last_dim
 from .utils import VocabUtility
@@ -152,7 +152,7 @@ class VocabParallelEmbedding(torch.nn.Module):
                 self.num_embeddings, get_tensor_model_parallel_rank(), # 当前gpu在其所在的并行群组中的rank
                 self.tensor_model_parallel_size)
         self.num_embeddings_per_partition = self.vocab_end_index - \
-            self.vocab_start_index
+            self.vocab_start_index # 一个gpu上负责的单词的数量
 
         # Allocate weights and initialize.
         args = get_args()
@@ -166,18 +166,23 @@ class VocabParallelEmbedding(torch.nn.Module):
         else:
             self.weight = Parameter(torch.empty(
                 self.num_embeddings_per_partition, self.embedding_dim,
-                device=torch.cuda.current_device(), dtype=args.params_dtype))
+                device=torch.cuda.current_device(), dtype=args.params_dtype)) # 当前GPU
             _initialize_affine_weight_gpu(self.weight, init_method,
                                           partition_dim=0, stride=1)
 
     def forward(self, input_):
-        if self.tensor_model_parallel_size > 1:
+        if self.tensor_model_parallel_size > 1: # 当前并行群组中gpu的数量
             # Build the mask.
             input_mask = (input_ < self.vocab_start_index) | \
-                         (input_ >= self.vocab_end_index)
+                         (input_ >= self.vocab_end_index) # | bit-based OR
             # Mask the input.
             masked_input = input_.clone() - self.vocab_start_index # TODO 为什么这里要-self.vocab_start_index?
             masked_input[input_mask] = 0
+            # example, [1,2,3,4] = vocab; current gpu's [1,2]
+            # input_=[3,2,4,1,2]
+            # input_mask=[True, False, True, False, False]
+            # masked_input = [3,2,4,1,2] - 1 = [2,1,3,0,1]
+            # masked_input = [0,1,0,0,1]???
         else:
             masked_input = input_
             # Get the embeddings.
@@ -187,9 +192,11 @@ class VocabParallelEmbedding(torch.nn.Module):
                                       self.sparse)
         # Mask the output embedding.
         if self.tensor_model_parallel_size > 1:
-            output_parallel[input_mask, :] = 0.0
+            output_parallel[input_mask, :] = 0.0 # 这里重要，[3,2,4,1,2]中的3和4对应的embeddings被设置为了0.0
+            # 所以, input_.clone() - self.vocab_start_index就无关紧要了！
         # Reduce across all the model parallel GPUs.
         output = reduce_from_tensor_model_parallel_region(output_parallel) # 前向全归约，后向复制
+        # 当前token的index如果不在当前gpu上，则其embedding vector为全0 -> 则通过all_reduce的方式，加和回来！
         return output
 
 
