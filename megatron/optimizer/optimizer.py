@@ -43,7 +43,8 @@ def _zero_grad_group_helper(group, set_to_none):
                     param.grad.detach_() # 将一个Variable从创建它的图中分离，并把它设置成叶子variable
                     # 其实就相当于变量之间的关系本来是x -> m -> y,
                     # 这里的叶子variable是x，但是这个时候对m进行了.detach_()操作,其实就是进行了两个操作：
-                    # 将m的grad_fn的值设置为None,这样m就不会再与前一个节点x关联，这里的关系就会变成x, m -> y,此时的m就变成了叶子结点
+                    # 将m的grad_fn的值设置为None,这样m就不会再与前一个节点x关联，
+                    # 这里的关系就会变成x, m -> y,此时的m就变成了叶子结点
                     # 然后会将m的requires_grad设置为False，这样对y进行backward()时就不会求m的梯度
                 else:
                     param.grad.requires_grad_(False)
@@ -231,7 +232,8 @@ class FP16OptimizerWithFP16Params(MegatronOptimizer):
 
 
     def _copy_model_grads_to_main_grads(self):
-        # This only needs to be done for the fp16 group：把fp16_groups中的param的grad，复制到fp32_groups中的param中.
+        # This only needs to be done for the fp16 group：
+        # 把fp16_groups中的param的grad，复制到fp32_groups中的param中.
         model_grads = []
         main_grads = []
         for model_group, main_group in zip(self.fp16_groups,

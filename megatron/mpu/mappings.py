@@ -15,9 +15,16 @@
 
 import torch
 
-from .initialize import get_tensor_model_parallel_group # 当前gpu所在的并行群组group
+from .initialize import get_tensor_model_parallel_group # 当前gpu所在的张量并行群组group
+# [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+# 即把一个tensor切成上下两个部分
+
 from .initialize import get_tensor_model_parallel_world_size # 当前并行群组（集群）的gpu的数量
+# 2. from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+
 from .initialize import get_tensor_model_parallel_rank # 当前gpu在其所在的并行群组中的rank
+# 相对的0或者1. from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+
 from .utils import split_tensor_along_last_dim # 沿着最后一个维度切割tensor
 
 
@@ -34,15 +41,19 @@ def _reduce(input_):
 
     # All-reduce. 就是这么简单？！直接调用已有的all_reduce方法！
     torch.distributed.all_reduce(input_, group=get_tensor_model_parallel_group())
-
+    # 沿着“张量-模型并行组”的当前组名，进行all_reduce全归约运算。
+    # e.g., from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+    # 例如，相当于把一个被二分切开的tensor（分布在两个gpu上），归约到一起
     return input_
 
 
-def _split(input_):
+def _split(input_): # tensor-model-parallel-group: 张量-模型并行-组
     """Split the tensor along its last dimension and keep the
     corresponding slice. 切：按照最后一列"""
 
     world_size = get_tensor_model_parallel_world_size()
+    # e.g., 2, from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+
     # Bypass the function if we are using only 1 GPU.
     if world_size==1:
         return input_
@@ -52,12 +63,14 @@ def _split(input_):
 
     # Note: torch.split does not create contiguous tensors by default.
     rank = get_tensor_model_parallel_rank()
+    # 0 or 1, from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+
     output = input_list[rank].contiguous()
 
     return output
 
 
-def _gather(input_):
+def _gather(input_): # tensor-model-parallel-group: 张量-模型并行-组
     """Gather tensors and concatenate along the last dimension. 拼凑，拼接"""
 
     world_size = get_tensor_model_parallel_world_size()
@@ -150,7 +163,7 @@ class _GatherFromModelParallelRegion(torch.autograd.Function):
 
 
 # -----------------
-# Helper functions.
+# Helper functions. "张量并行组"
 # -----------------
 
 def copy_to_tensor_model_parallel_region(input_): # 复制-全归约

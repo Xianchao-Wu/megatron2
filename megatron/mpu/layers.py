@@ -25,8 +25,14 @@ import torch.nn.functional as F
 import torch.nn.init as init
 from torch.nn.parameter import Parameter
 
-from .initialize import get_tensor_model_parallel_rank # """Return my rank for the tensor model parallel group.""" 并行群组中的当前gpu的rank
-from .initialize import get_tensor_model_parallel_world_size # """Return world size for the tensor model parallel group.""" 并行群组中的gpu的数量
+from .initialize import get_tensor_model_parallel_rank # """Return my rank for the tensor model parallel group.""" 
+# 张量-并行群组中的当前gpu的rank
+# alike [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]中得到的0或者1
+
+from .initialize import get_tensor_model_parallel_world_size # """Return world size for the tensor model parallel group.""" 
+# 张量-并行群组中的gpu的数量
+# 2. alike from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+
 from .mappings import copy_to_tensor_model_parallel_region # “复制-全归约”
 from .mappings import gather_from_tensor_model_parallel_region # “拼凑-切割”
 from .mappings import reduce_from_tensor_model_parallel_region # “全归约-复制”
@@ -76,9 +82,9 @@ def _initialize_affine_weight_gpu(weight, init_method,
     """Initialize affine weight for model parallel on GPU."""
 
     set_tensor_model_parallel_attributes(tensor=weight,
-                                         is_parallel=True,
-                                         dim=partition_dim,
-                                         stride=stride)
+                                         is_parallel=True, # 属性1
+                                         dim=partition_dim, # 属性2
+                                         stride=stride) # 属性3
 
     with get_cuda_rng_tracker().fork(): # rng = random number generator
         init_method(weight)
@@ -94,9 +100,9 @@ def _initialize_affine_weight_cpu(weight, output_size, input_size,
     the relevant chunk."""
 
     set_tensor_model_parallel_attributes(tensor=weight,
-                                         is_parallel=True,
-                                         dim=partition_dim,
-                                         stride=stride)
+                                         is_parallel=True, # 属性1
+                                         dim=partition_dim, # 属性2
+                                         stride=stride) # 属性3
 
     # Initialize master weight
     master_weight = torch.empty(output_size, input_size,
@@ -111,8 +117,9 @@ def _initialize_affine_weight_cpu(weight, output_size, input_size,
     weight_list = torch.split(master_weight, per_partition_per_stride_size,
                               dim=partition_dim)
     rank = get_model_parallel_rank()
-    world_size = get_tensor_model_parallel_world_size() # 当前的gpu所在的并行群组中的gpu的数量
-    my_weight_list = weight_list[rank::world_size]
+    world_size = get_tensor_model_parallel_world_size() # 当前的gpu所在的"张量-并行群组"group中的gpu的数量
+    # alike 2 for groups: [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
+    my_weight_list = weight_list[rank::world_size] # 起点为rank，步长为world_size，一直到weight_list的尽头
 
     with torch.no_grad():
         torch.cat(my_weight_list, dim=partition_dim, out=weight)
@@ -145,8 +152,9 @@ class VocabParallelEmbedding(torch.nn.Module):
         self.scale_grad_by_freq = False
         self.sparse = False
         self._weight = None
-        self.tensor_model_parallel_size = get_tensor_model_parallel_world_size() # 当前gpu所在的并行群组中gpu的数量
-        # Divide the weight matrix along the vocaburaly dimension.
+        self.tensor_model_parallel_size = get_tensor_model_parallel_world_size() # 当前gpu所在的"张量-并行群组"中gpu的数量
+        # e.g., self.tensor_model_parallel_size=2
+        # Divide the weight matrix along the vocabulary dimension.
         self.vocab_start_index, self.vocab_end_index = \
             VocabUtility.vocab_range_from_global_vocab_size( # 当前rank的gpu所覆盖的子词表index: [index_first, index_last)
                 self.num_embeddings, get_tensor_model_parallel_rank(), # 当前gpu在其所在的并行群组中的rank
@@ -182,7 +190,7 @@ class VocabParallelEmbedding(torch.nn.Module):
             # input_=[3,2,4,1,2]
             # input_mask=[True, False, True, False, False]
             # masked_input = [3,2,4,1,2] - 1 = [2,1,3,0,1]
-            # masked_input = [0,1,0,0,1]???
+            # masked_input = [0,1,0,0,1]??? -> 没有关系的！参看output_parallel[input_mask, :]=0.0
         else:
             masked_input = input_
             # Get the embeddings.
@@ -191,7 +199,7 @@ class VocabParallelEmbedding(torch.nn.Module):
                                       self.norm_type, self.scale_grad_by_freq,
                                       self.sparse)
         # Mask the output embedding.
-        if self.tensor_model_parallel_size > 1:
+        if self.tensor_model_parallel_size > 1: # e.g., tensor_model_parallel_size=2
             output_parallel[input_mask, :] = 0.0 # 这里重要，[3,2,4,1,2]中的3和4对应的embeddings被设置为了0.0
             # 所以, input_.clone() - self.vocab_start_index就无关紧要了！
         # Reduce across all the model parallel GPUs.
@@ -351,7 +359,7 @@ class RowParallelLinear(torch.nn.Module):
         self.output_size = output_size # 例如，hidden_size of transformer = h
         self.input_is_parallel = input_is_parallel
         # Divide the weight matrix along the last dimension.
-        world_size = get_tensor_model_parallel_world_size() # 当前并行群组中gpu的数量
+        world_size = get_tensor_model_parallel_world_size() # 当前"张量-并行群组"中gpu的数量, e.g. 2
         self.input_size_per_partition = divide(input_size, world_size) # 类似于从A到A_1, A_2, ..., A_p; 这里是从4h到4h/p
         self.skip_bias_add = skip_bias_add
 
@@ -398,7 +406,8 @@ class RowParallelLinear(torch.nn.Module):
             input_parallel = input_
         else:
             input_parallel = scatter_to_tensor_model_parallel_region(input_) # 前向切割，后向拼凑
-            # 如果有必要，先把输入inputs_=X按照?（应该是最后一列，即4h -> 4h/p）切割，按照gpu的数量。得到的是X_1, ..., X_p这样的，shape是?
+            # 如果有必要，先把输入inputs_=X按照?（应该是最后一列，即4h -> 4h/p）切割，按照gpu的数量。
+            # 得到的是X_1, ..., X_p这样的，shape是?
             # (batch, seq, 4*hidden/p) 或者(seq, batch, 4*hidden/p)
 
         # Matrix multiply. [Y1*B1] to [Yi*Bi] in Figure 3(a):

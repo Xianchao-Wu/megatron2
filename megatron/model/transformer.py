@@ -70,10 +70,10 @@ class ParallelMLP(MegatronModule):
         args = get_args()
 
         # [first linear layer] Project to 4h: (alike position-wise feed-forward layer in transformer)
-        self.dense_h_to_4h = mpu.ColumnParallelLinear( # TODO use mpu's 列并行-linear-layer
+        self.dense_h_to_4h = mpu.ColumnParallelLinear( # TODO-okay: use mpu's 列并行-linear-layer
             args.hidden_size, # input.size，最大的隐层维度（按照gpu个数分割前的）= Transformer hidden size
             4 * args.hidden_size, # output.size, 4*最大的隐层维度 = 4 * "Transformer hidden size"
-            gather_output=False, # TODO why not True? 不需要gather, 即不需要对XA1, ..., XAp进行“前向拼接，后向切割”处理！
+            gather_output=False, # TODO-okay why not True? 不需要gather, 即不需要对XA1, ..., XAp进行“前向拼接，后向切割”处理！
             init_method=init_method, # 初始化方法
             skip_bias_add=True)
 
@@ -85,7 +85,7 @@ class ParallelMLP(MegatronModule):
             self.activation_func = erf_gelu
 
         # [second linear layer] Project back to h.
-        self.dense_4h_to_h = mpu.RowParallelLinear( # TODO use mpu's 行并行-linear-layer
+        self.dense_4h_to_h = mpu.RowParallelLinear( # TODO-okay use mpu's 行并行-linear-layer
             4 * args.hidden_size, # 4 * "Transformer hidden size" 最大的隐层维度
             args.hidden_size, # 最大的隐层维度, 'Transformer hidden size'
             input_is_parallel=True,
@@ -95,8 +95,8 @@ class ParallelMLP(MegatronModule):
 
     def forward(self, hidden_states):
 
-        # [s, b, 4hp] (序列长度，批大小，4*一个划分上的隐层维度hp)? TODO
-        # 这里应该是一个整体的隐层维度大小（所有gpu的整体）[s, b, 4*h]
+        # [s, b, 4hp] (序列长度，批大小，4*一个划分上的隐层维度hp)? TODO-okay
+        # 这里应该是一个整体的隐层维度大小（所有gpu的整体）[s, b, 4*h] -> NO, is [s, b, 4h/p] for one gpu!
         intermediate_parallel, bias_parallel = self.dense_h_to_4h(hidden_states)
 
         if self.bias_gelu_fusion:
@@ -106,9 +106,9 @@ class ParallelMLP(MegatronModule):
             intermediate_parallel = \
                 self.activation_func(intermediate_parallel + bias_parallel)
 
-        # [s, b, h] (序列长度，皮大小，隐层整体维度？！居然不是hp? TODO) -> 应该不是hp; 应该是4h -> h
+        # [s, b, h] (序列长度，皮大小，隐层整体维度？！居然不是hp? TODO-okay) -> 应该不是hp; 应该是4hp -> h
         # RowParallelLinear : 负责对整体的hidden size，按照gpu进行切割处理
-        output, output_bias = self.dense_4h_to_h(intermediate_parallel)
+        output, output_bias = self.dense_4h_to_h(intermediate_parallel) # is from [s, b, 4hp] to [s, b, h] (入分，出和)
         return output, output_bias
 
 
@@ -141,12 +141,13 @@ class ParallelSelfAttention(MegatronModule):
         self.num_attention_heads_per_partition = mpu.divide(
             args.num_attention_heads, world_size) # n/p
 
-        # Strided linear layer. (strided何意？TODO)
+        # Strided linear layer. (strided何意？步幅TODO)
         self.query_key_value = mpu.ColumnParallelLinear( # alike q'=Qq, k'=Kk, and v'=Vv
             args.hidden_size, # h
             3 * args.hidden_size, # 3h
             gather_output=False,
             init_method=init_method) # h->3h的列并行Linear网络（细节可以参考ParallelMLP中的h->4h的情况）
+        # real case is alike: h -> 3h/p = 3hp
 
         coeff = None # 系数 coefficient
         self.norm_factor = math.sqrt(self.hidden_size_per_attention_head) # sqrt(h/n)
@@ -167,7 +168,7 @@ class ParallelSelfAttention(MegatronModule):
         # on average it should not be partition dependent.
         self.attention_dropout = torch.nn.Dropout(args.attention_dropout)
 
-        # Output.
+        # Output. real case is alike h/p=hp -> h
         self.dense = mpu.RowParallelLinear(
             args.hidden_size, # h
             args.hidden_size, # h
@@ -219,11 +220,12 @@ class ParallelSelfAttention(MegatronModule):
         # Query, Key, and Value
         # =====================
 
-        # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)], np=每个gpu上head的数量, hn=每个head的隐层维度，np*3*hn=3h/p是一个gpu上的！
-        # 不应该在这里的啊！这里的应该是3h作为输出的维度 TODO（这里是“总调度”，不是各个gpu上的并行）
+        # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)], 
+        # np=每个gpu上head的数量, hn=每个head的隐层维度，np*3*hn=3h/p是一个gpu上的！
+        # 不应该在这里的啊！这里的应该是3h作为输出的维度 TODO-okay（这里是“总调度”，不是各个gpu上的并行）
         # n/p * 3 * h/n = 3h/p finally (is actually for one gpu's hidden dimension!)
         mixed_x_layer, _ = self.query_key_value(hidden_states) # from h to 3h，这里还是整体的变换（非也，是h -> 3h/p）
-        # TODO 等待确认，实际输出的是3h/p，也就是说，是一个gpu上的！[确认]
+        # TODO-okay 等待确认，实际输出的是3h/p，也就是说，是一个gpu上的！[确认]
 
         checkpoint_version = get_checkpoint_version()
         if checkpoint_version is not None:
@@ -270,7 +272,7 @@ class ParallelSelfAttention(MegatronModule):
                        query_layer.size(0), # sq = sequench length of q
                        key_layer.size(0)) # sk = sequence length of k
         
-        # [sq, b, np, hn] -> [sq, b * np, hn] # batch * num_head_per_gpu -> 类似于组成了新的batch!
+        # [sq, b, np, hn] -> [sq, b * np, hn] # batch * num_head_per_gpu -> 相乘之后，类似于组成了新的batch!
         query_layer = query_layer.view(output_size[2],
                                        output_size[0] * output_size[1], -1) # [sq, b*np, hn]
         key_layer = key_layer.view(output_size[3],
@@ -322,9 +324,9 @@ class ParallelSelfAttention(MegatronModule):
                                                   attention_mask)
 
         # This is actually dropping out entire tokens to attend to, which might
-        # seem a bit unusual, but is taken from the original Transformer paper.
+        # seem a bit unusual, but is taken from the original Transformer paper.# TODO where? to confirm?
         with mpu.get_cuda_rng_tracker().fork():
-            attention_probs = self.attention_dropout(attention_probs) # TODO where? to confirm?
+            attention_probs = self.attention_dropout(attention_probs) 
 
 
         # =========================
@@ -348,8 +350,8 @@ class ParallelSelfAttention(MegatronModule):
         attention_probs = attention_probs.view(output_size[0] * output_size[1],
                                                output_size[2], -1)
         
-        # matmul: [b * np, sq, hn]
-        context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1)) # TODO important , X*V^T
+        # matmul: [b*np, sq, sk] * [b*np, sk, hn] -> [b * np, sq, hn]
+        context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1)) # TODO-okay important , X*V^T
         # where X = softmax(Q*K^T/scalar_for_scale)
 
         # change view [b, np, sq, hn]
@@ -358,7 +360,7 @@ class ParallelSelfAttention(MegatronModule):
         # [b, np, sq, hn] --> [sq, b, np, hn]
         context_layer = context_layer.permute(2, 0, 1, 3).contiguous()
 
-        # [sq, b, np, hn] --> [sq, b, hp]
+        # [sq, b, np, hn] --> [sq, b, hp=np*hn=n/p*h/n=h/p]
         new_context_layer_shape = context_layer.size()[:-2] + \
             (self.hidden_size_per_partition,)
         context_layer = context_layer.view(*new_context_layer_shape)
@@ -408,6 +410,9 @@ class ParallelTransformerLayer(MegatronModule):
 
     Transformore layer takes input with size [b, s, h] and returns an
     output of the same size.
+    b=batch size; 
+    s=seq length;
+    h=hidden size.
     """
 
     def __init__(self, attention_mask_func, init_method, 
@@ -421,7 +426,7 @@ class ParallelTransformerLayer(MegatronModule):
             = args.apply_residual_connection_post_layernorm
 
         # Layernorm on the input data.
-        LayerNorm = import_layernorm(args.fp32_residual_connection)
+        LayerNorm = import_layernorm(args.fp32_residual_connection) # from megatron.model import import_layernorm
         self.input_layernorm = LayerNorm(
             args.hidden_size,
             eps=args.layernorm_epsilon)
@@ -438,13 +443,17 @@ class ParallelTransformerLayer(MegatronModule):
             args.hidden_size,
             eps=args.layernorm_epsilon)
 
-        # MLP
+        # MLP, h->4h->h
         self.mlp = ParallelMLP(init_method,
                                output_layer_init_method)
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
         # hidden_states: [b, s, h]
+        # x -> [self.layernorm] -> x1 -> self.attention -> x2 -> bias_dropout_add_residual -> x3 -> self.mlp -> x4
+        # -> bias_dropout_add_residual -> x5
+        # 基本符合，一个transformer block: 先是self-attention，之后是h->4h->h的MLP这样的两个子块
+        # 其中还有基于layer.norm和residual的变换和残差求和。
 
         # Layer norm at the begining of the transformer layer.
         layernorm_output = self.input_layernorm(hidden_states)
@@ -459,10 +468,10 @@ class ParallelTransformerLayer(MegatronModule):
             attention_output, presents = attention_output
     
         # Residual connection.
-        if self.apply_residual_connection_post_layernorm:
-            residual = layernorm_output
+        if self.apply_residual_connection_post_layernorm: # layernorm之后是残差链接(bert的原来的做法)
+            residual = layernorm_output # 用的是layernorm之后的结果作为x
         else:
-            residual = hidden_states
+            residual = hidden_states # 原来的输入x
 
         # jit scripting for a nn.module (with dropout) is not 
         # trigerring the fusion kernel. For now, we use two 
@@ -540,7 +549,7 @@ class ParallelTransformer(MegatronModule):
 
         if mpu.is_pipeline_last_stage():
             # Final layer norm before output.
-            LayerNorm = import_layernorm(args.fp32_residual_connection)
+            LayerNorm = import_layernorm(args.fp32_residual_connection) # from megatron.model import import_layernorm
             self.final_layernorm = LayerNorm(
                 args.hidden_size,
                 eps=args.layernorm_epsilon)
@@ -612,7 +621,8 @@ class ParallelTransformer(MegatronModule):
                     presents.append(present)
         
         # Final layer norm.
-        if mpu.is_pipeline_last_stage():
+        if mpu.is_pipeline_last_stage(): # 即当前gpu的rank = world_size - 1! 也就是说当前的gpu是"gpu并行群组"的最后一个
+            # defined in megatron/mpu/initialize.py
             # Reverting data format change [s b h] --> [b s h].
             hidden_states = hidden_states.transpose(0, 1).contiguous()
             output = self.final_layernorm(hidden_states)

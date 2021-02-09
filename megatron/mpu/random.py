@@ -102,26 +102,29 @@ def _set_cuda_rng_state(new_state, device=-1):
     _lazy_call(cb)
 
 
-def split_tensor_into_1d_equal_chunks(tensor):
+def split_tensor_into_1d_equal_chunks(tensor): # 切割，按照"张量-模型并行组"中gpu的数量
     """Break a tensor into equal 1D chunks."""
     data = tensor.view(-1)
-    partition_size = torch.numel(data) // get_tensor_model_parallel_world_size()
-    start_index = partition_size * get_tensor_model_parallel_rank()
+    partition_size = torch.numel(data) // get_tensor_model_parallel_world_size() # //2
+    start_index = partition_size * get_tensor_model_parallel_rank() # 当前gpu所在的tensor-模型并行组-的rank
     end_index = start_index + partition_size
     return data[start_index:end_index]
 
 
-def gather_split_1d_tensor(tensor):
-    """Opposite of above function, gather values from model parallel ranks."""
-    world_size = get_tensor_model_parallel_world_size()
-    numel = torch.numel(tensor)
-    numel_gathered = world_size * numel
+def gather_split_1d_tensor(tensor): # 拼凑
+    """Opposite-相反的 of above function, gather values from model parallel ranks."""
+    world_size = get_tensor_model_parallel_world_size() # 2
+    numel = torch.numel(tensor) # tensor是当前gpu上分到的局部
+    numel_gathered = world_size * numel # numel_gathered是 "张量-模型并行组"中的gpu的数量 * 单个gpu上分到的tensor的size
     gathered = torch.empty(numel_gathered, dtype=tensor.dtype,
                            device=torch.cuda.current_device(),
                            requires_grad=False)
     chunks = [gathered[i*numel:(i+1)*numel] for i in range(world_size)]
     torch.distributed.all_gather(chunks, tensor,
                                  group=get_tensor_model_parallel_group())
+    # chunks = output list. it should contain correctly-sized tensors to be used for output of the collective.
+    # tensor = tensor to be broadcast from current process! 从当前线程向外广播的tensor
+    # group = the process group to work on: 当前工作的"线程组" (张量-模型并行-组)
     return gathered
 
 
@@ -130,8 +133,7 @@ class CudaRNGStatesTracker:
 
     Using the `add` method, a cuda rng (random-number-generator) state is initialized based on
     the input `seed` and is assigned to `name`. Later, by forking the
-    rng state, we can perform operations and return to our starting
-    cuda state.
+    rng state, we can perform operations and return to our starting cuda state.
     """
 
     def __init__(self):
@@ -244,8 +246,7 @@ def model_parallel_cuda_manual_seed(seed):
 
 
 class CheckpointFunction(torch.autograd.Function):
-    """This function is adapted from torch.utils.checkpoint with
-       two main changes:
+    """This function is adapted from torch.utils.checkpoint with two main changes:
            1) torch.cuda.set_rng_state is replaced with `_set_cuda_rng_state`
            2) the states in the model parallel tracker are also properly
               tracked/set/reset.
@@ -272,7 +273,6 @@ class CheckpointFunction(torch.autograd.Function):
 
         # Store everything.
         ctx.save_for_backward(*args)
-
 
         return outputs
 
@@ -312,7 +312,6 @@ class CheckpointFunction(torch.autograd.Function):
         grads = tuple(inp.grad if isinstance(inp, torch.Tensor) else inp
                       for inp in detached_inputs)
         return (None,) + grads
-
 
 def checkpoint(function, *args):
     """Checkpoint a model or part of the model.
