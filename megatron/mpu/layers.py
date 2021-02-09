@@ -29,8 +29,9 @@ from .initialize import get_tensor_model_parallel_rank # """Return my rank for t
 # 张量-并行群组中的当前gpu的rank
 # alike [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]中得到的0或者1
 
-from .initialize import get_tensor_model_parallel_world_size # """Return world size for the tensor model parallel group.""" 
-# 张量-并行群组中的gpu的数量
+from .initialize import get_tensor_model_parallel_world_size # 
+# """Return world size for the tensor model parallel group.""" 
+# 张量-并行群组中的gpu的数量 (例如，2，类似于对一个张量进行上下切割成两份)
 # 2. alike from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
 
 from .mappings import copy_to_tensor_model_parallel_region # “复制-全归约”
@@ -152,7 +153,8 @@ class VocabParallelEmbedding(torch.nn.Module):
         self.scale_grad_by_freq = False
         self.sparse = False
         self._weight = None
-        self.tensor_model_parallel_size = get_tensor_model_parallel_world_size() # 当前gpu所在的"张量-并行群组"中gpu的数量
+        self.tensor_model_parallel_size = get_tensor_model_parallel_world_size() 
+        # 当前gpu所在的"张量-并行群组"中gpu的数量
         # e.g., self.tensor_model_parallel_size=2
         # Divide the weight matrix along the vocabulary dimension.
         self.vocab_start_index, self.vocab_end_index = \
@@ -418,7 +420,8 @@ class RowParallelLinear(torch.nn.Module):
         # 然后经过线性层，从4h/p维度，被映射成了h维度。所以，最后的输出是(b, s, h).
 
         # All-reduce across all the partitions. [g function in Figure 3(a)]
-        output_ = reduce_from_tensor_model_parallel_region(output_parallel) # 前向全归约，后向复制(Figure 3(a) right-hand-side)
+        output_ = reduce_from_tensor_model_parallel_region(output_parallel) 
+        # 前向全归约，后向复制(Figure 3(a) right-hand-side)
         # 对每个gpu上的(b, s, h)进行all_reduce，叠加（求平均），然后得到的是(b, s, h)，每个gpu上面都保持了最新的结果。
 
         if not self.skip_bias_add: # add:

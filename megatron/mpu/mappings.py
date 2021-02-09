@@ -82,9 +82,11 @@ def _gather(input_): # tensor-model-parallel-group: 张量-模型并行-组
     last_dim = input_.dim() - 1
     rank = get_tensor_model_parallel_rank()
 
-    tensor_list = [torch.empty_like(input_) for _ in range(world_size)] # 在当前gpu，声明这么大的list，感觉内存很有压力啊！TODO
+    tensor_list = [torch.empty_like(input_) for _ in range(world_size)] 
+    # 在当前gpu，声明这么大的list，感觉内存很有压力啊！TODO 一个tensor
     tensor_list[rank] = input_ # input_是一个gpu的负担量，这里把tensor_list的rank位置的值，设定为input_
-    torch.distributed.all_gather(tensor_list, input_, group=get_tensor_model_parallel_group()) # 把多个进程的数据，拼凑在一起！
+    torch.distributed.all_gather(tensor_list, input_, group=get_tensor_model_parallel_group()) 
+    # 把多个进程的数据，拼凑在一起！
 
     # Note: torch.cat already creates a contiguous tensor.
     output = torch.cat(tensor_list, dim=last_dim).contiguous() #按照最后一列拼接，然后设置整个output是contiguous的！

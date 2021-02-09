@@ -34,7 +34,8 @@ _MODEL_PARALLEL_GROUP = None # [0, 1, 4, 5, 8, 9, 12, 13], [2, 3, 6, 7, 10, 11, 
 # Embedding group.
 _EMBEDDING_GROUP = None # alike, [0, 12], [1, 13], [2, 14], [3, 15]
 # Data parallel group that the current rank belongs to.
-_DATA_PARALLEL_GROUP = None # 当前gpu所在的（所属于的）数据并行组, [[0, 2], [1, 3], [4, 6], [5, 7], [8, 10], [9, 11], [12, 14], [13, 15]]
+_DATA_PARALLEL_GROUP = None # 当前gpu所在的（所属于的）数据并行组, 
+# [[0, 2], [1, 3], [4, 6], [5, 7], [8, 10], [9, 11], [12, 14], [13, 15]]
 
 # These values enable us to change the mpu sizes on the fly. (什么是on the fly?)
 _MPU_TENSOR_MODEL_PARALLEL_WORLD_SIZE = None # 2, alike [g0, g1], ..., [g14, g15]
@@ -57,8 +58,10 @@ def initialize_model_parallel(tensor_model_parallel_size_=1,
     Initialize model data parallel groups.
 
     Arguments:
-        tensor_model_parallel_size: number of GPUs used to parallelize model tensor. (模型中的张量并行相关的gpus数量) - 2
-        pipeline_model_parallel_size: number of GPUs used to parallelize model pipeline. (模型中的管道并行相关的gpus数量) - 4
+        tensor_model_parallel_size: number of GPUs used to parallelize model tensor. 
+            (模型中的张量并行相关的gpus数量) - 2
+        pipeline_model_parallel_size: number of GPUs used to parallelize model pipeline. 
+            (模型中的管道并行相关的gpus数量) - 4
 
     Let's say we have a total of 16 GPUs denoted by g0 ... g15 and 
     we use x=2 GPUs to parallelize the model tensor, and y=4 GPUs to parallelize the model pipeline. 
@@ -350,7 +353,8 @@ def get_pipeline_model_parallel_prev_rank():
         "Pipeline parallel group is not initialized"
     rank_in_pipeline = get_pipeline_model_parallel_rank()
     world_size = get_pipeline_model_parallel_world_size()
-    return _PIPELINE_GLOBAL_RANKS[(rank_in_pipeline - 1) % world_size] # 如果当前的是第0个，那么-1/world_size=word_size-1
+    return _PIPELINE_GLOBAL_RANKS[(rank_in_pipeline - 1) % world_size] 
+    # 如果当前的是第0个，那么-1/world_size=word_size-1
     # e.g., -1/100 = 99!
     # [0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]
 
