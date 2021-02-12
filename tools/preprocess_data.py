@@ -93,8 +93,12 @@ class Encoder(object):
 def get_args():
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group(title='input data')
+    apath = r'C:\Users\user\source\repos\megatron\megatron\pretrained'
+    #apath = r'C:\Users\xianchaow\source\repos\megatron\pretrained\'
+    definput = apath + r'\bert_pretrain\small_data_line3.json'
+    vocabfn = apath + r'\bert-large-cased-vocab.txt'
     group.add_argument('--input', type=str, required=False,
-                       default=r'C:\Users\xianchaow\source\repos\megatron\pretrained\bert_pretrain\small_data_line3.json',
+                       default=definput,
                        help='Path to input JSON')
     group.add_argument('--json-keys', nargs='+', default=['text'],
                        help='space separate listed of keys to extract from json')
@@ -114,7 +118,7 @@ def get_args():
                                 'GPT2BPETokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--vocab-file', type=str, 
-                       default=r'C:\Users\xianchaow\source\repos\megatron\pretrained\bert-large-cased-vocab.txt',
+                       default=vocabfn,
                        help='Path to the vocab file')
     group.add_argument('--merge-file', type=str, default=None,
                        help='Path to the BPE merge file (if necessary).')
@@ -200,13 +204,21 @@ def main():
             for sentence in sentences:
                 builders[key].add_item(torch.IntTensor(sentence))
             builders[key].end_document()
-        if i % args.log_interval == 0:
+        if i % args.log_interval == 0: # or i==len(encoded_docs):
             current = time.time()
             elapsed = current - proc_start
             mbs = total_bytes_processed/elapsed/1024/1024
-            print(f"Processed {i} documents",
-                  f"({i/elapsed} docs/s, {mbs} MB/s).",
+            print("Processed {} documents".format(i),
+                  "({:.4f} docs/s, {:.4f} MB/s).".format(i/elapsed, mbs),
                   file=sys.stderr)
+
+    # finally, after process:
+    current = time.time()
+    elapsed = current - proc_start
+    mbs = total_bytes_processed/elapsed/1024/1024
+    print("Processed {} documents".format(i),
+        "({:.4f} docs/s, {:.4f} MB/s).".format(i/elapsed, mbs),
+        file=sys.stderr)
 
     for key in args.json_keys:
         builders[key].finalize(output_idx_files[key])
