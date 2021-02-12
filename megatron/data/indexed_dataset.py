@@ -538,7 +538,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
 
 class MMapIndexedDatasetBuilder(object):
     def __init__(self, out_file, dtype=np.int64):
-        self._data_file = open(out_file, 'wb')
+        self._data_file = open(out_file, 'wb') # write, binary file
         self._dtype = dtype
         self._sizes = []
         self._doc_idx = [0]

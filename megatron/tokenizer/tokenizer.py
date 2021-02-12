@@ -54,10 +54,11 @@ def _vocab_size_with_padding(orig_vocab_size, args):
     """Pad vocab size so it is divisible by model parallel size and
     still having GPU friendly size."""
 
-    after = orig_vocab_size
+    after = orig_vocab_size # wc -l bert-large-cased-vocab.txt, -> , 28996 bert-large-cased-vocab.txt
+    # 128
     multiple = args.make_vocab_size_divisible_by * \
-        args.tensor_model_parallel_size
-    while (after % multiple) != 0:
+        args.tensor_model_parallel_size # 1
+    while (after % multiple) != 0: # 要求vocab_size可以整除128，从而从28996修改为29056，且有：29056/128=227是整数了
         after += 1
     if args.rank == 0:
         print(' > padded vocab (size: {}) with {} dummy tokens '
@@ -128,7 +129,7 @@ class _BertWordPieceTokenizer(AbstractTokenizer):
     """Original BERT wordpiece tokenizer."""
 
     def __init__(self, vocab_file, lower_case=True):
-        if lower_case:
+        if lower_case: # True
             name = 'BERT Lower Case'
         else:
             name = 'BERT Upper Case'

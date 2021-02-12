@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>6e9ff4b7-c9f5-46bc-89fe-ca6bf56de590</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>pretrain_bert.py</StartupFile>
+    <StartupFile>tools\preprocess_data.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>

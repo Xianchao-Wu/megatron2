@@ -93,21 +93,28 @@ class Encoder(object):
 def get_args():
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group(title='input data')
-    group.add_argument('--input', type=str, required=True,
+    group.add_argument('--input', type=str, required=False,
+                       default=r'C:\Users\xianchaow\source\repos\megatron\pretrained\bert_pretrain\small_data_line3.json',
                        help='Path to input JSON')
     group.add_argument('--json-keys', nargs='+', default=['text'],
                        help='space separate listed of keys to extract from json')
-    group.add_argument('--split-sentences', action='store_true',
+    group.add_argument('--split-sentences', action='store_false', #action='store_true',
                        help='Split documents into sentences.')
+    #store_true 是指带触发action时为真，不触发则为假，2L说的代码去掉default初始化，其功能也不会变化
+    #parser.add_argument('-c', action='store_true')#python test.py -c         => c是true（触发）
+    #python test.py             => c是false（无触发）
+
     group.add_argument('--keep-newlines', action='store_true',
                        help='Keep newlines between sentences when splitting.')
 
     group = parser.add_argument_group(title='tokenizer')
-    group.add_argument('--tokenizer-type', type=str, required=True,
+    group.add_argument('--tokenizer-type', type=str, required=False,
+                       default='BertWordPieceLowerCase',
                        choices=['BertWordPieceLowerCase','BertWordPieceCase',
                                 'GPT2BPETokenizer'],
                        help='What type of tokenizer to use.')
-    group.add_argument('--vocab-file', type=str, default=None,
+    group.add_argument('--vocab-file', type=str, 
+                       default=r'C:\Users\xianchaow\source\repos\megatron\pretrained\bert-large-cased-vocab.txt',
                        help='Path to the vocab file')
     group.add_argument('--merge-file', type=str, default=None,
                        help='Path to the BPE merge file (if necessary).')
@@ -116,7 +123,8 @@ def get_args():
 
 
     group = parser.add_argument_group(title='output data')
-    group.add_argument('--output-prefix', type=str, required=True,
+    group.add_argument('--output-prefix', type=str, required=False,
+                       default='my-bert-debug',
                        help='Path to binary output file without suffix')
     group.add_argument('--dataset-impl', type=str, default='mmap',
                        choices=['lazy', 'cached', 'mmap'])
@@ -145,7 +153,7 @@ def main():
     startup_start = time.time()
 
     print("Opening", args.input)
-    fin = open(args.input, 'r', encoding='utf-8')
+    fin = open(args.input, 'r', encoding='utf-8') # json file
 
     if nltk_available and args.split_sentences:
         nltk.download("punkt", quiet=True)
@@ -153,11 +161,11 @@ def main():
     encoder = Encoder(args)
     tokenizer = build_tokenizer(args)
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
-    encoded_docs = pool.imap(encoder.encode, fin, 25)
+    encoded_docs = pool.imap(encoder.encode, fin, 25) # TODO what is "25"?
     #encoded_docs = map(encoder.encode, fin)
 
     level = "document"
-    if args.split_sentences:
+    if args.split_sentences: # True
         level = "sentence"
 
     print(f"Vocab size: {tokenizer.vocab_size}")
@@ -165,7 +173,7 @@ def main():
     output_bin_files = {}
     output_idx_files = {}
     builders = {}
-    for key in args.json_keys:
+    for key in args.json_keys: # ['text'] 只有'text'这一个重要的元素
         output_bin_files[key] = "{}_{}_{}.bin".format(args.output_prefix,
                                                       key, level)
         output_idx_files[key] = "{}_{}_{}.idx".format(args.output_prefix,
@@ -181,7 +189,14 @@ def main():
 
     for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
         total_bytes_processed += bytes_processed
-        for key, sentences in doc.items():
+        for key, sentences in doc.items(): # sentences = [[15457, 1166, 1103, 16688, 3676]] -> jumps over the lazy dog
+            # sentences = [[15457, 1166, 1103, 16688, 3676, 119], -> jumps over the lazy dog .
+            # [178, 1108, 1177, 6782, 1106, 2100, 1115, 119], 
+            # [1142, 1110, 170, 1363, 1285, 2052, 119], 
+            # [9367, 171, 19954, 1358, 119], "fuck b ##aid ##u ." = 5 tokens
+            # [9367, 17599, 7301, 4964, 119]], "fuck micro ##so ##ft ." = 5 tokens
+            # jumps over the lazy dog. i was so sad to hear that. this is a good day today. fuck baidu. fuck microsoft.
+            # 119="."
             for sentence in sentences:
                 builders[key].add_item(torch.IntTensor(sentence))
             builders[key].end_document()
@@ -197,4 +212,4 @@ def main():
         builders[key].finalize(output_idx_files[key])
 
 if __name__ == '__main__':
-    main()
+    main() # local test okay (without gpu), to test the Japanese tokenizer in the future.
