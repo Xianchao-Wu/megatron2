@@ -203,6 +203,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
 
     # Load the checkpoint.
     try:
+        print('checkpoint_name={}'.format(checkpoint_name))
         state_dict = torch.load(checkpoint_name, map_location='cpu')
     except ModuleNotFoundError:
         from megatron.fp16_deprecated import loss_scaler
@@ -249,7 +250,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
         args.consumed_valid_samples = getattr(checkpoint_args,
                                               'consumed_valid_samples', 0)
     else:
-        print_rank_0('could not find arguments in the checkpoint ...')
+        print_rank_0('could not find arguments(args) in the checkpoint ...')
 
     # Model.
     model.load_state_dict(state_dict['model'])

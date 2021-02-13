@@ -8,12 +8,17 @@ DISTRIBUTED_ARGS="--nproc_per_node $WORLD_SIZE \
                   --master_addr localhost \
                   --master_port 6000"
 
-TRAIN_DATA="data/RACE/train/middle"
-VALID_DATA="data/RACE/dev/middle \
-            data/RACE/dev/high"
-VOCAB_FILE=bert-vocab.txt
-PRETRAINED_CHECKPOINT=checkpoints/bert_345m
-CHECKPOINT_PATH=checkpoints/bert_345m_race
+TRAIN_DATA="/workspace/megatron/ngc_models/bert_evaluate/RACE/train/middle"
+VALID_DATA="/workspace/megatron/ngc_models/bert_evaluate/RACE/dev/middle \
+            /workspace/megatron/ngc_models/bert_evaluate/RACE/dev/high"
+
+#VOCAB_FILE=/workspace/megatron/ngc_models/bert-large-uncased-vocab.txt
+#PRETRAINED_CHECKPOINT=/workspace/megatron/ngc_models/release_bert_345m_uncased
+
+VOCAB_FILE=/workspace/megatron/ngc_models/bert-large-cased-vocab.txt
+PRETRAINED_CHECKPOINT=/workspace/megatron/ngc_models/release_bert_345m_cased
+
+CHECKPOINT_PATH=/workspace/megatron/ngc_models/bert_evaluate/checkpoints/bert_345m_race
 
 python -m torch.distributed.launch $DISTRIBUTED_ARGS ./tasks/main.py \
                --task RACE \
