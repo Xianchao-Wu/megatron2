@@ -25,7 +25,7 @@ from .gpt2_tokenization import GPT2Tokenizer
 def build_tokenizer(args):
     """Initialize tokenizer."""
     if args.rank == 0:
-        print('> building {} tokenizer ...'.format(args.tokenizer_type),
+        print('> building {} tokenizer ...'.format(args.tokenizer_type), # e.g., BertWordPieceLowerCase
               flush=True)
 
     # Select and instantiate the tokenizer.
@@ -44,8 +44,8 @@ def build_tokenizer(args):
                                   'implemented.'.format(args.tokenizer_type))
 
     # Add vocab size.
-    args.padded_vocab_size = _vocab_size_with_padding(tokenizer.vocab_size,
-                                                      args)
+    args.padded_vocab_size = _vocab_size_with_padding(tokenizer.vocab_size, # 28996
+                                                      args) # 28996 -> 29056
 
     return tokenizer
 
@@ -64,7 +64,7 @@ def _vocab_size_with_padding(orig_vocab_size, args):
         print(' > padded vocab (size: {}) with {} dummy tokens '
               '(new size: {})'.format(
                   orig_vocab_size, after - orig_vocab_size, after), flush=True)
-    return after
+    return after # 并没有修改任何东西，只是计算出来了一个after=new vocab size with pad
 
 
 class AbstractTokenizer(ABC):
@@ -135,10 +135,10 @@ class _BertWordPieceTokenizer(AbstractTokenizer):
             name = 'BERT Upper Case'
         super().__init__(name)
         self.tokenizer = FullBertTokenizer(vocab_file, do_lower_case=lower_case)
-        self.cls_id = self.tokenizer.vocab['[CLS]']
-        self.sep_id = self.tokenizer.vocab['[SEP]']
-        self.pad_id = self.tokenizer.vocab['[PAD]']
-        self.mask_id = self.tokenizer.vocab['[MASK]']
+        self.cls_id = self.tokenizer.vocab['[CLS]'] # 101
+        self.sep_id = self.tokenizer.vocab['[SEP]'] # 102
+        self.pad_id = self.tokenizer.vocab['[PAD]'] # 0
+        self.mask_id = self.tokenizer.vocab['[MASK]'] # 103
 
     @property
     def vocab_size(self):
@@ -196,7 +196,7 @@ class _GPT2BPETokenizer(AbstractTokenizer):
 
         self.tokenizer = GPT2Tokenizer(vocab_file, merge_file, errors='replace',
                                        special_tokens=[], max_len=None)
-        self.eod_id = self.tokenizer.encoder['<|endoftext|>']
+        self.eod_id = self.tokenizer.encoder['<|endoftext|>'] # eod=end of document
 
     @property
     def vocab_size(self):

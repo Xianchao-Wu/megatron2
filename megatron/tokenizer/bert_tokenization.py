@@ -75,13 +75,13 @@ def validate_case_matches_checkpoint(do_lower_case, init_checkpoint):
                                               model_name, case_name, opposite_flag))
 
 
-def convert_to_unicode(text):
+def convert_to_unicode(text): # Ja can have, OKAY
     """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
-    if six.PY3:
+    if six.PY3: # 返回一个表示当前运行环境是否为python3的boolean值 
         if isinstance(text, str):
             return text
         elif isinstance(text, bytes):
-            return text.decode("utf-8", "ignore")
+            return text.decode("utf-8", "ignore") # errors='ignore', 设置不同的错误处理方案，'strict'的时候，如果编码错误，则会引起一个UnicodeError.
         else:
             raise ValueError("Unsupported string type: %s" % (type(text)))
     elif six.PY2:
@@ -126,7 +126,7 @@ def load_vocab(vocab_file):
         while True:
             token = convert_to_unicode(reader.readline())
             if not token:
-                break
+                break # TODO why break? should be 'continue'?
             token = token.strip()
             vocab[token] = index
             index += 1
@@ -137,7 +137,7 @@ def convert_by_vocab(vocab, items):
     """Converts a sequence of [tokens|ids] using the vocab."""
     output = []
     for item in items:
-        output.append(vocab[item])
+        output.append(vocab[item]) # 问题，vocab是str:id，如果item不在vocab中呢？
     return output
 
 
@@ -155,15 +155,16 @@ def whitespace_tokenize(text):
     if not text:
         return []
     tokens = text.split()
-    return tokens
+    return tokens # 根据' '来切分当前的输入的text，构造出来tokens这个list
 
 
 class FullTokenizer(object):
     """Runs end-to-end tokenziation."""
 
     def __init__(self, vocab_file, do_lower_case=True):
-        self.vocab = load_vocab(vocab_file)
-        self.inv_vocab = {v: k for k, v in self.vocab.items()}
+        self.vocab = load_vocab(vocab_file) 
+        # str:id		vocab_file	'C:\\Users\\user\\source\\repos\\megatron\\megatron\\pretrained\\bert-large-cased-vocab.txt'	str
+        self.inv_vocab = {v: k for k, v in self.vocab.items()} # id:str, 词典的“逆”
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
         self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
 
@@ -222,7 +223,11 @@ class BasicTokenizer(object):
 
     def _run_strip_accents(self, text):
         """Strips accents from a piece of text."""
-        text = unicodedata.normalize("NFD", text)
+        # 类似于从"Montréal, über, 12.89, Mère, Françoise, noël, 889"
+        # 到：Montreal, uber, 12.89, Mere, Francoise, noel, 889
+        text = unicodedata.normalize("NFD", text) # 'Montréal, über, 12.89, Mère, Françoise, noël, 889'
+        # -》 'Montréal, über, 12.89, Mère, Françoise, noël, 889' 分离开了字母和逻辑重音
+        # e ̀
         output = []
         for char in text:
             cat = unicodedata.category(char)
@@ -258,7 +263,7 @@ class BasicTokenizer(object):
             cp = ord(char)
             if self._is_chinese_char(cp):
                 output.append(" ")
-                output.append(char)
+                output.append(char) # 中文汉字都独立起来了，不太好！TODO
                 output.append(" ")
             else:
                 output.append(char)
@@ -304,7 +309,7 @@ class WordpieceTokenizer(object):
     """Runs WordPiece tokenziation."""
 
     def __init__(self, vocab, unk_token="[UNK]", max_input_chars_per_word=200):
-        self.vocab = vocab
+        self.vocab = vocab # str:id的词典 ordereddict
         self.unk_token = unk_token
         self.max_input_chars_per_word = max_input_chars_per_word
 
@@ -369,7 +374,7 @@ def _is_whitespace(char):
     if char == " " or char == "\t" or char == "\n" or char == "\r":
         return True
     cat = unicodedata.category(char)
-    if cat == "Zs":
+    if cat == "Zs": # [Zs] Separator, Space
         return True
     return False
 
@@ -381,7 +386,7 @@ def _is_control(char):
     if char == "\t" or char == "\n" or char == "\r":
         return False
     cat = unicodedata.category(char)
-    if cat in ("Cc", "Cf"):
+    if cat in ("Cc", "Cf"): # [Cc] Other, Control; [Cf] Other, Format
         return True
     return False
 
@@ -398,5 +403,12 @@ def _is_punctuation(char):
         return True
     cat = unicodedata.category(char)
     if cat.startswith("P"):
+        # [Pc] Punctuation, Connector
+        # [Pd] Punctuation, Dash
+        # [Pe] Punctuation, Close
+        # [Pf] Punctuation, Final quote (may behave like Ps or Pe depending on usage)
+        # [Pi] Punctuation, Initial quote (may behave like Ps or Pe depending on usage)
+        # [Po] Punctuation, Other
+        # [Ps] Punctuation, Open
         return True
     return False

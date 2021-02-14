@@ -36,7 +36,7 @@ from megatron.data import indexed_dataset
 
 
 # https://stackoverflow.com/questions/33139531/preserve-empty-lines-with-nltks-punkt-tokenizer
-class CustomLanguageVars(nltk.tokenize.punkt.PunktLanguageVars):
+class CustomLanguageVars(nltk.tokenize.punkt.PunktLanguageVars): # TODO 可以为日语也定制一下
 
     _period_context_fmt = r"""
         \S*                          # some word material
@@ -58,12 +58,12 @@ class Encoder(object):
 
     def initializer(self):
         # Use Encoder class as a container for global data
-        Encoder.tokenizer = build_tokenizer(self.args)
-        if self.args.split_sentences:
+        Encoder.tokenizer = build_tokenizer(self.args) # 重要：第一个是tokenizer，负责类似分词的工作
+        if self.args.split_sentences: # 重要：第二个是负责句子切割的
             if not nltk_available:
                 print("NLTK is not available to split sentences.")
                 exit()
-            splitter = nltk.load("tokenizers/punkt/english.pickle")
+            splitter = nltk.load("tokenizers/punkt/english.pickle") # TODO other languages?
             if self.args.keep_newlines:
                 # this prevents punkt from eating newlines after sentences
                 Encoder.splitter = nltk.tokenize.punkt.PunktSentenceTokenizer(
@@ -72,17 +72,17 @@ class Encoder(object):
             else:
                 Encoder.splitter = splitter
 
-        else:
+        else: # 如果不切分句子的话，直接原样返回：
             Encoder.splitter = IdentitySplitter()
 
-    def encode(self, json_line):
+    def encode(self, json_line): # 该方法负责把一行输入的json格式的document(text)分别进行“句子切割”和“word to id"的变换：
         data = json.loads(json_line)
         ids = {}
         for key in self.args.json_keys:
             text = data[key]
             doc_ids = []
-            for sentence in Encoder.splitter.tokenize(text):
-                sentence_ids = Encoder.tokenizer.tokenize(sentence)
+            for sentence in Encoder.splitter.tokenize(text): # TODO 重要，这里进行句子级别的切割
+                sentence_ids = Encoder.tokenizer.tokenize(sentence) # TODO 重要，这里进行从一个字符串句子到一个ids构成的句子之间的变换
                 if len(sentence_ids) > 0:
                     doc_ids.append(sentence_ids)
             if self.args.append_eod:
@@ -92,7 +92,7 @@ class Encoder(object):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    group = parser.add_argument_group(title='input data')
+    group = parser.add_argument_group(title='input data') # 一组输入参数
     apath = r'C:\Users\user\source\repos\megatron\megatron\pretrained'
     #apath = r'C:\Users\xianchaow\source\repos\megatron\pretrained\'
     definput = apath + r'\bert_pretrain\small_data_line3.json'
@@ -101,8 +101,8 @@ def get_args():
                        default=definput,
                        help='Path to input JSON')
     group.add_argument('--json-keys', nargs='+', default=['text'],
-                       help='space separate listed of keys to extract from json')
-    group.add_argument('--split-sentences', action='store_false', #action='store_true',
+                       help='space separate listed of keys to extract from json') # 其他keys会被直接无视
+    group.add_argument('--split-sentences', action='store_false', #action='store_true', #目前是默认split sentence of a document
                        help='Split documents into sentences.')
     #store_true 是指带触发action时为真，不触发则为假，2L说的代码去掉default初始化，其功能也不会变化
     #parser.add_argument('-c', action='store_true')#python test.py -c         => c是true（触发）
@@ -122,7 +122,7 @@ def get_args():
                        help='Path to the vocab file')
     group.add_argument('--merge-file', type=str, default=None,
                        help='Path to the BPE merge file (if necessary).')
-    group.add_argument('--append-eod', action='store_true',
+    group.add_argument('--append-eod', action='store_true', # 如果没有--append-eod，则表示不增加<eod>
                        help='Append an <eod> token to the end of a document.')
 
 
@@ -131,7 +131,7 @@ def get_args():
                        default='my-bert-debug',
                        help='Path to binary output file without suffix')
     group.add_argument('--dataset-impl', type=str, default='mmap',
-                       choices=['lazy', 'cached', 'mmap'])
+                       choices=['lazy', 'cached', 'mmap']) # memory-map?
 
     group = parser.add_argument_group(title='runtime')
     group.add_argument('--workers', type=int, default=1,
@@ -139,11 +139,11 @@ def get_args():
     group.add_argument('--log-interval', type=int, default=100,
                        help='Interval between progress updates')
     args = parser.parse_args()
-    args.keep_empty = False
+    args.keep_empty = False # TODO
 
     if args.tokenizer_type.lower().startswith('bert'):
         if not args.split_sentences:
-            print("Bert tokenizer detected, are you sure you don't want to split sentences?")
+            print("Warning: Bert tokenizer detected, are you sure you don't want to split sentences?")
 
     # some default/dummy values for the tokenizer
     args.rank = 0
@@ -156,15 +156,15 @@ def main():
     args = get_args()
     startup_start = time.time()
 
-    print("Opening", args.input)
+    print("Opening", args.input) # input json file
     fin = open(args.input, 'r', encoding='utf-8') # json file
 
     if nltk_available and args.split_sentences:
-        nltk.download("punkt", quiet=True)
+        nltk.download("punkt", quiet=True) # punkt for sentence tokenizer
 
     encoder = Encoder(args)
-    tokenizer = build_tokenizer(args)
-    pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
+    tokenizer = build_tokenizer(args) # TODO why need this? 可以直接用encoder.tokenizer
+    pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer) # TODO，构建一个Pool对象，进程池
     encoded_docs = pool.imap(encoder.encode, fin, 25) # TODO what is "25"?
     #encoded_docs = map(encoder.encode, fin)
 
@@ -189,7 +189,7 @@ def main():
     startup_end = time.time()
     proc_start = time.time()
     total_bytes_processed = 0
-    print("Time to startup:", startup_end - startup_start)
+    print("Time cost to startup:", startup_end - startup_start)
 
     for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
         total_bytes_processed += bytes_processed

@@ -544,14 +544,14 @@ class MMapIndexedDatasetBuilder(object):
         self._doc_idx = [0]
 
     def add_item(self, tensor):
-        np_array = np.array(tensor.numpy(), dtype=self._dtype)
+        np_array = np.array(tensor.numpy(), dtype=self._dtype) # 不知不觉的时候，就已经转换为了id! (from text to id) TODO
         self._data_file.write(np_array.tobytes(order='C'))
         self._sizes.append(np_array.size)
 
     def end_document(self):
         self._doc_idx.append(len(self._sizes))
 
-    def merge_file_(self, another_file):
+    def merge_file_(self, another_file): # TODO a way to speed up the data preparing progress?
         # Concatenate index
         index = MMapIndexedDataset.Index(index_file_path(another_file))
         assert index.dtype == self._dtype
