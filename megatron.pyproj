@@ -77,6 +77,7 @@
     <Compile Include="megatron\optimizer\__init__.py" />
     <Compile Include="megatron\package_info.py" />
     <Compile Include="megatron\text_generation_utils.py" />
+    <Compile Include="megatron\tokenizer\bert_tokenization_jp.py" />
     <Compile Include="megatron\tokenizer\bert_tokenization.py" />
     <Compile Include="megatron\tokenizer\gpt2_tokenization.py" />
     <Compile Include="megatron\tokenizer\tokenizer.py" />

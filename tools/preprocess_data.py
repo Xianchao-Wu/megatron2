@@ -63,17 +63,30 @@ class Encoder(object):
             if not nltk_available:
                 print("NLTK is not available to split sentences.")
                 exit()
-            splitter = nltk.load("tokenizers/punkt/english.pickle") # TODO other languages?
-            if self.args.keep_newlines:
-                # this prevents punkt from eating newlines after sentences
-                Encoder.splitter = nltk.tokenize.punkt.PunktSentenceTokenizer(
-                    train_text = splitter._params,
-                    lang_vars = CustomLanguageVars())
+            if self.args.tokenizer_type == "BertWordPieceJp":
+                # TODO for japanese langugae's sentence split:
+                #from nltk.tokenize import RegexpTokenizer
+                jp_sent_splitter = nltk.RegexpTokenizer(u'[^！？。]*[！？。]')
+                Encoder.splitter = jp_sent_splitter
             else:
-                Encoder.splitter = splitter
+                splitter = nltk.load("tokenizers/punkt/english.pickle") # TODO other languages?
+                if self.args.keep_newlines:
+                    # this prevents punkt from eating newlines after sentences
+                    Encoder.splitter = nltk.tokenize.punkt.PunktSentenceTokenizer(
+                        train_text = splitter._params,
+                        lang_vars = CustomLanguageVars())
+                else:
+                    Encoder.splitter = splitter
 
         else: # 如果不切分句子的话，直接原样返回：
             Encoder.splitter = IdentitySplitter()
+
+    def sent_split(self, text):
+        if args.tokenizer_type == "BertWordPieceJp":
+            # TODO special sentence separator for Japanese language:
+            print('TODO japanese sent split')
+        else:
+            return Encoder.splitter.tokenize(text)
 
     def encode(self, json_line): # 该方法负责把一行输入的json格式的document(text)分别进行“句子切割”和“word to id"的变换：
         data = json.loads(json_line)
@@ -81,8 +94,10 @@ class Encoder(object):
         for key in self.args.json_keys:
             text = data[key]
             doc_ids = []
-            for sentence in Encoder.splitter.tokenize(text): # TODO 重要，这里进行句子级别的切割
+            for sentence in Encoder.splitter.tokenize(text): # TODO 重要，这里进行句子级别的切割，日语需要特别处理！
+                #for sentence in sent_split(text):
                 sentence_ids = Encoder.tokenizer.tokenize(sentence) # TODO 重要，这里进行从一个字符串句子到一个ids构成的句子之间的变换
+                #print('sent_ids={}'.format(sentence_ids))
                 if len(sentence_ids) > 0:
                     doc_ids.append(sentence_ids)
             if self.args.append_eod:
@@ -95,8 +110,11 @@ def get_args():
     group = parser.add_argument_group(title='input data') # 一组输入参数
     apath = r'C:\Users\user\source\repos\megatron\megatron\pretrained'
     #apath = r'C:\Users\xianchaow\source\repos\megatron\pretrained\'
-    definput = apath + r'\bert_pretrain\small_data_line3.json'
-    vocabfn = apath + r'\bert-large-cased-vocab.txt'
+    #definput = apath + r'\bert_pretrain\small_data_line3.json'
+    #vocabfn = apath + r'\bert-large-cased-vocab.txt'
+    definput = apath + r'\bert_pretrain\small_data_line_jp.json'
+    vocabfn = r'C:\Users\user\source\repos\megatron\megatron\pretrained\tohoku-u\BERT-base_mecab-ipadic-bpe-32k\vocab.txt'
+
     group.add_argument('--input', type=str, required=False,
                        default=definput,
                        help='Path to input JSON')
@@ -113,8 +131,8 @@ def get_args():
 
     group = parser.add_argument_group(title='tokenizer')
     group.add_argument('--tokenizer-type', type=str, required=False,
-                       default='BertWordPieceLowerCase',
-                       choices=['BertWordPieceLowerCase','BertWordPieceCase',
+                       default='BertWordPieceJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
+                       choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceJp'
                                 'GPT2BPETokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--vocab-file', type=str, 
@@ -122,6 +140,8 @@ def get_args():
                        help='Path to the vocab file')
     group.add_argument('--merge-file', type=str, default=None,
                        help='Path to the BPE merge file (if necessary).')
+    group.add_argument('--mecab-dict-path', type=str, default=None,
+                       help='Path to the dict(ipadict/unidict) of MeCab for Japanese Word Breaker.')
     group.add_argument('--append-eod', action='store_true', # 如果没有--append-eod，则表示不增加<eod>
                        help='Append an <eod> token to the end of a document.')
 

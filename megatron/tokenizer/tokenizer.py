@@ -19,6 +19,7 @@ from abc import ABC
 from abc import abstractmethod
 
 from .bert_tokenization import FullTokenizer as FullBertTokenizer
+from .bert_tokenization_jp import FullTokenizer as FullBertTokenizerJp
 from .gpt2_tokenization import GPT2Tokenizer
 
 
@@ -36,6 +37,9 @@ def build_tokenizer(args):
     elif args.tokenizer_type == 'BertWordPieceCase':
         tokenizer = _BertWordPieceTokenizer(vocab_file=args.vocab_file,
                                             lower_case=False)
+    elif args.tokenizer_type == "BertWordPieceJp": # no need to separate "case" and "lowercase" for Jp
+        tokenizer = _BertWordPieceTokenizerJp(vocab_file=args.vocab_file,
+                                              mecab_dict_path=args.mecab_dict_path)
     elif args.tokenizer_type == 'GPT2BPETokenizer':
         assert args.merge_file is not None
         tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
@@ -135,6 +139,67 @@ class _BertWordPieceTokenizer(AbstractTokenizer):
             name = 'BERT Upper Case'
         super().__init__(name)
         self.tokenizer = FullBertTokenizer(vocab_file, do_lower_case=lower_case)
+        self.cls_id = self.tokenizer.vocab['[CLS]'] # 101
+        self.sep_id = self.tokenizer.vocab['[SEP]'] # 102
+        self.pad_id = self.tokenizer.vocab['[PAD]'] # 0
+        self.mask_id = self.tokenizer.vocab['[MASK]'] # 103
+
+    @property
+    def vocab_size(self):
+        return self.tokenizer.vocab_size()
+
+    @property
+    def vocab(self):
+        return self.tokenizer.vocab
+
+    @property
+    def inv_vocab(self):
+        return self.tokenizer.inv_vocab
+
+    def tokenize(self, text):
+        text_tokens = self.tokenizer.tokenize(text)
+        return self.tokenizer.convert_tokens_to_ids(text_tokens)
+
+    def decode_token_ids(self, token_ids):
+        tokens = self.tokenizer.convert_ids_to_tokens(token_ids)
+        exclude_list = ['[PAD]', '[CLS]']
+        non_pads = [t for t in tokens if t not in exclude_list]
+
+        result = ""
+        for s in non_pads:
+            if s.startswith("##"):
+                result += s[2:]
+            else:
+                result += " " + s
+
+        return result
+
+    @property
+    def cls(self):
+        return self.cls_id
+
+    @property
+    def sep(self):
+        return self.sep_id
+
+    @property
+    def pad(self):
+        return self.pad_id
+
+    @property
+    def mask(self):
+        return self.mask_id
+
+class _BertWordPieceTokenizerJp(AbstractTokenizer):
+    """Original BERT wordpiece tokenizer for Japanese (mecab+ipadict, wordpiece, case-insensitive)."""
+
+    def __init__(self, vocab_file, lower_case=True, mecab_dict_path=None):
+        if lower_case: # True by default
+            name = 'BERT Japanese Lower Case'
+        else:
+            name = 'BERT Japanese Upper Case'
+        super().__init__(name)
+        self.tokenizer = FullBertTokenizerJp(vocab_file, do_lower_case=lower_case, mecab_dict_path=mecab_dict_path)
         self.cls_id = self.tokenizer.vocab['[CLS]'] # 101
         self.sep_id = self.tokenizer.vocab['[SEP]'] # 102
         self.pad_id = self.tokenizer.vocab['[PAD]'] # 0
