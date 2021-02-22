@@ -31,7 +31,7 @@ python -m torch.distributed.launch $DISTRIBUTED_ARGS \
        --global-batch-size 16 \
        --seq-length 512 \
        --max-position-embeddings 512 \
-       --train-iters 1000000 \
+       --train-iters 5000000 \
        --save $CHECKPOINT_PATH_OUT \
        --load $CHECKPOINT_PATH_IN \
        --data-path $DATA_PATH \
@@ -47,7 +47,7 @@ python -m torch.distributed.launch $DISTRIBUTED_ARGS \
        --clip-grad 1.0 \
        --lr-warmup-fraction .01 \
        --log-interval 1000 \
-       --save-interval 10000 \
+       --save-interval 50000 \
        --eval-interval 5000 \
        --eval-iters 10 \
        --fp16
