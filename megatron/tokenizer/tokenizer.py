@@ -21,6 +21,7 @@ from abc import abstractmethod
 from .bert_tokenization import FullTokenizer as FullBertTokenizer
 from .bert_tokenization_jp import FullTokenizer as FullBertTokenizerJp
 from .gpt2_tokenization import GPT2Tokenizer
+from .gpt2_tokenization_jp import GPT2Tokenizer as GPT2TokenizerJp
 
 
 def build_tokenizer(args):
@@ -41,8 +42,12 @@ def build_tokenizer(args):
         tokenizer = _BertWordPieceTokenizerJp(vocab_file=args.vocab_file,
                                               mecab_dict_path=args.mecab_dict_path)
     elif args.tokenizer_type == 'GPT2BPETokenizer':
-        assert args.merge_file is not None
+        assert args.merge_file is not None # for english only, byte level bpe tokenizer is not fittable for japanese/chinese
         tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
+    elif args.tokenizer_type == 'GPT2BPETokenizerJp':
+        tokenizer = _GPT2BPETokenizerJp(vocab_file=args.vocab_file,
+                                        mecab_dict_path=args.mecab_dict_path,
+                                        emoji_file=args.emoji_file)
     else:
         raise NotImplementedError('{} tokenizer is not '
                                   'implemented.'.format(args.tokenizer_type))
@@ -284,3 +289,38 @@ class _GPT2BPETokenizer(AbstractTokenizer):
     @property
     def eod(self):
         return self.eod_id
+
+class _GPT2BPETokenizerJp(AbstractTokenizer):
+    """Adapted Japanese GPT2 BPE tokenizer."""
+
+    def __init__(self, vocab_file, mecab_dict_path=None, emoji_file=None):
+        name = 'GPT2 BPE Japanese'
+        super().__init__(name)
+
+        self.tokenizer = GPT2TokenizerJp(vocab_file, mecab_dict_path, emoji_file, errors='replace',
+                                       special_tokens=[], max_len=None)
+        self.eod_id = self.tokenizer.encoder['<|endoftext|>'] # eod=end of document
+        # C:\Users\user\source\repos\gpt2-japanese\ja-bpe.txt 中有这个eod!
+
+    @property
+    def vocab_size(self):
+        return len(self.tokenizer.encoder)
+
+    @property
+    def vocab(self):
+        return self.tokenizer.encoder
+
+    @property
+    def inv_vocab(self):
+        return self.tokenizer.decoder
+
+    def tokenize(self, text):
+        return self.tokenizer.encode(text)
+
+    def detokenize(self, token_ids):
+        return self.tokenizer.decode(token_ids)
+
+    @property
+    def eod(self):
+        return self.eod_id
+

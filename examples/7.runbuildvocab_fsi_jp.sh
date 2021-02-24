@@ -6,6 +6,10 @@
 #########################################################################
 #!/bin/bash
 
+# NOTE IMPORTANT:
+# run this bash at the directory of the parent folder of "examples"
+# e.g., bash examples/7.runbuildvocab_fsi_jp.sh > examples/7.runbuildvocab_fsi_jp.sh.log 2>&1 &
+
 #infile="/raid/xianchaow/megatron/datasets/japanese-fsi/MainichiNews.t0.txt.gz.simp.txt"
 #infile="/raid/xianchaow/megatron/datasets/japanese-fsi/jp.fsi.8files.txt"
 infile="/workspace/megatron/datasets/japanese-fsi/jp.fsi.8files.txt"

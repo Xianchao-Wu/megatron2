@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import regex as re
+import numpy as np
 from io import open
 
 try:
@@ -91,8 +92,157 @@ def get_pairs(word):
         prev_char = char
     return pairs
 
-
+# code reference from : https://github.com/tanreinama/gpt2-japanese
 class GPT2Tokenizer(object):
+    # Usage: self.tokenizer = GPT2TokenizerJp(vocab_file, mecab_dict_path, emoji_file, errors='replace',
+    #                                   special_tokens=[], max_len=None)
+    def __init__(self, vocab_file, mecab_dict_path=None, emoji_file=None, 
+                 errors='replace', special_tokens=[], max_len=None):
+        
+        #self.special_tokens = {}
+        #self.special_tokens_decoder = {}
+        self.set_special_tokens(special_tokens)
+        self.errors = errors
+
+        with open(vocab_file, encoding='utf-8') as f:
+            self.bpe = f.read().split('\n') # self.bpe is a list
+
+        self.encoder = {tokstr:id for id, tokstr in enumerate(self.bpe)}
+        self.decoder = {v:k for k, v in self.encoder.items()}
+
+        self.maxlen = max_len if max_len else np.max([len(w) for w in self.bpe]) #+ self.special_tokens])
+        if emoji_file:
+            with open(emoji_file, encoding='utf-8') as f:
+                self.emoji = json.loads(f.read())
+
+        self.content_repatter1 = re.compile(r"(https?|ftp)(:\/\/[-_\.!~*\'()a-zA-Z0-9;\/?:\@&=\+$,%#]+)")
+        self.content_repatter2 = re.compile(r"[A-Za-z0-9\._+]*@[\-_0-9A-Za-z]+(\.[A-Za-z]+)*")
+        self.content_repatter3 = re.compile(r'[\(]{0,1}[0-9]{2,4}[\)\-\(]{0,1}[0-9]{2,4}[\)\-]{0,1}[0-9]{3,4}')
+        self.content_repatter4 = re.compile(r"([12]\d{3}[/\-年])*(0?[1-9]|1[0-2])[/\-月]((0?[1-9]|[12][0-9]|3[01])日?)*(\d{1,2}|:|\d{1,2}時|\d{1,2}分|\(日\)|\(月\)|\(火\)|\(水\)|\(木\)|\(金\)|\(土\))*")
+        self.content_repatter5 = re.compile(r"(明治|大正|昭和|平成|令和)\d{1,2}年(0?[1-9]|1[0-2])月(0?[1-9]|[12][0-9]|3[01])日(\d{1,2}|:|\d{1,2}時|\d{1,2}分|\(日\)|\(月\)|\(火\)|\(水\)|\(木\)|\(金\)|\(土\))*")
+        self.content_repatter6 = re.compile(r'((0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*億)*((0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*万)*((0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*千)*(0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*(千円|万円|千万円|円|千ドル|万ドル|千万ドル|ドル|千ユーロ|万ユーロ|千万ユーロ|ユーロ)+(\(税込\)|\(税抜\)|\+tax)*')
+
+    def __len__(self):
+        return len(self.bpe) + len(self.special_tokens)
+
+    def set_special_tokens(self, special_tokens):
+        """ Add a list of additional tokens to the encoder.
+            The additional tokens are indexed starting from the last index of the
+            current vocabulary in the order of the `special_tokens` list.
+        """
+        if not special_tokens:
+            self.special_tokens = {}
+            self.special_tokens_decoder = {}
+            return
+        self.special_tokens = dict((tok, len(self.encoder) + i)
+                                   for i, tok in enumerate(special_tokens))
+        self.special_tokens_decoder = {v: k for k, v in self.special_tokens.items()}
+        logger.info("Special tokens {}".format(self.special_tokens))
+
+    def clean_text(self, content):
+        content = jaconv.z2h(content, kana=False, digit=True, ascii=True)
+        content = self.content_repatter1.sub("<URL>" ,content)
+        content = self.content_repatter2.sub("<EMAIL>" ,content)
+        content = self.content_repatter3.sub("<TEL>" ,content)
+        content = self.content_repatter4.sub("<DATE>" ,content)
+        content = self.content_repatter5.sub("<DATE>" ,content)
+        content = self.content_repatter6.sub("<PRICE>" ,content)
+        return content
+
+    def encode(self, text, clean=False):
+        text = text.replace(' ', '<SP>')
+        text = text.replace('　', '<SP>')
+        text = text.replace('\r\n', '<BR>')
+        text = text.replace('\n', '<BR>')
+        text = text.replace('\r', '<BR>')
+        text = text.replace('\t', '<TAB>')
+        text = text.replace('—', 'ー')
+        text = text.replace('−', 'ー')
+        for k,v in self.emoji['emoji'].items():
+            if k in text:
+                text = text.replace(k, v)
+        if clean:
+            text = self.clean_text(text)
+        pos = 0
+        result = []
+        while pos < len(text):
+            bp = False
+            end = min(len(text), pos+self.maxlen+1) if text[pos]=='<' else pos+2
+            for e in range(end, pos, -1):
+                wd = text[pos:e]
+                if wd in self.bpe:
+                    result.append(self.bpe.index(wd))
+                    pos = e
+                    bp = True
+                    break
+            if not bp:
+                end = pos+1
+                wd = text[pos:end]
+                for i in wd.encode('utf-8'):
+                    result.append(self.bpe.index('<|byte%d|>'%i))
+                pos = end
+        if True:
+            textback = self.decode(result)
+            print('encode str2id: in={}, out={}, in.back={}'.format(text, result, textback))
+        '''
+        Opening C:\Users\user\source\repos\megatron\megatron\pretrained\bert_pretrain\small_data_line_jp.json
+        > building GPT2BPETokenizerJp tokenizer ...
+         > padded vocab (size: 20573) with 35 dummy tokens (new size: 20608)
+        Vocab size: 20573
+        Output prefix: my-gpt2-ja-debug
+        Time cost to startup: 6.793119430541992
+        > building GPT2BPETokenizerJp tokenizer ...
+         > padded vocab (size: 20573) with 35 dummy tokens (new size: 20608)
+        encode str2id: in=<SP>「オタ」とも呼ばれているこのペラナカン（華人）の特製料理は、とてもおいしいスナック料理です。, 
+          out=[20298, 20262, 5049, 20263, 211, 16050, 529, 19, 537, 16011, 5156, 7684, 15402, 20076, 6561, 20077, 16011, 6408, 406, 17450, 20257, 214, 8413, 1007, 18073, 8184, 813, 406, 3, 20258], 
+          in.back= 「オタ」とも呼ばれているこのペラナカン（華人）の特製料理は、とてもお いしいスナック料理です。
+        encode str2id: in=これは、ココナッツミルクやチリペースト、レモングラス、ガーリックと一緒に魚を砕き、それを、蒸して柔らかくしたバナナの葉に包んで炭火で軽く焼いた料理です。, 
+          out=[85, 17450, 20257, 2717, 3904, 15046, 1664, 17380, 18729, 4120, 407, 539, 20257, 3313, 553, 455, 20257, 974, 2435, 17380, 17764, 269, 18737, 15227, 17804, 19791, 15707, 20257, 45, 17804, 20257, 19422, 5, 15414, 1200, 1992, 15552, 4958, 15520, 16011, 18685, 18737, 15630, 239, 14797, 15541, 16898, 19341, 16617, 17661, 21, 406, 3, 20258], 
+          in.back=これは、ココナッツミルクやチリペースト、レモングラス、ガーリックと一緒に魚を砕き、それを、蒸して柔らかくしたバナナの葉に包んで炭火で軽く焼いた料理です。
+        encode str2id: in=このレシピは、アジアの数地域で知られています。, 
+          out=[7, 2048, 14879, 17450, 20257, 1515, 16398, 16011, 19776, 370, 16898, 16455, 162, 19, 34, 20258], 
+          in.back=このレシピは、アジアの数地域で知られています。
+        encode str2id: in=「オタオタ（otak<SP>otak<SP>）」は、マレー語で「脳」を意味します。, 
+          out=[20262, 5049, 5049, 20076, 20241, 20246, 20227, 20237, 20298, 20241, 20246, 20227, 20237, 20298, 20077, 20263, 17450, 20257, 8301, 17119, 15790, 16898, 20262, 19960, 20263, 17804, 551, 67, 15335, 20258], 
+          in.back=「オタオタ（otak otak ）」は、マレー語で「脳」を意味します。
+        encode str2id: in=この「オタオタ」という名前は、この料理の柔らかくトロリとした食感から由来しています。, 
+          out=[7, 20262, 5049, 5049, 20263, 12, 15498, 500, 17450, 20257, 7, 406, 16011, 15414, 1200, 16617, 1829, 17402, 15, 15552, 4202, 0, 3666, 5, 138, 15335, 20258], 
+          in.back=この「オタオタ」という名前は、この料理の柔らかくトロリとした食感から由来しています。
+        encode str2id: in=魚を使ったオタオタが、最も一般的ですが、エビやイカ、カニ、魚の頭などを用いたものなど、そのバリエーションは豊富です。, 
+          out=[15227, 17804, 18888, 17, 5049, 5049, 16090, 20257, 15484, 18325, 873, 15398, 3, 16090, 20257, 4376, 18729, 3401, 20257, 5990, 20257, 15227, 16011, 15014, 18, 17804, 15643, 21, 84, 18, 20257, 4, 3018, 1754, 1049, 15402, 17450, 4026, 3, 20258], 
+          in.back=魚を使ったオタオタが、最も一般的ですが、エビやイカ、カニ、魚の頭などを用いたものなど、そのバリエーションは豊富です。
+        Processed 1 documents (0.4862 docs/s, 0.0002 MB/s).
+        Press any key to continue . . .
+        '''
+        return result
+
+    def decode(self, tokens, breakline='\n'):
+        words = []
+        byte_tokens = []
+        for i in tokens:
+            word = self.bpe[i]
+            if word[:6] == '<|byte' and word[-2:] == '|>':
+                byte_tokens.append(int(word[6:-2]))
+            else:
+                if len(byte_tokens) > 0:
+                    words.append(bytearray(byte_tokens).decode('utf-8', errors=self.errors))
+                    byte_tokens = []
+                if word[:7] == '<|emoji' and word[-2:] == '|>':
+                    words.append(self.emoji['emoji_inv'][word])
+                elif word == '<SP>':
+                    words.append(' ')
+                elif word == '<BR>':
+                    words.append(breakline)
+                elif word == '<TAB>':
+                    words.append('\t')
+                else:
+                    words.append(word)
+        if len(byte_tokens) > 0:
+            words.append(bytearray(byte_tokens).decode('utf-8', errors=self.errors))
+        text = ''.join(words)
+        return text
+
+class GPT2TokenizerOrig(object):
     """
     GPT-2 BPE tokenizer. Peculiarities (特性):
         - Byte-level BPE

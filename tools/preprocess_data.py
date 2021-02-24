@@ -63,8 +63,8 @@ class Encoder(object):
             if not nltk_available:
                 print("NLTK is not available to split sentences.")
                 exit()
-            if self.args.tokenizer_type == "BertWordPieceJp":
-                # TODO for japanese langugae's sentence split:
+            if self.args.tokenizer_type == "BertWordPieceJp" or self.args.tokenizer_type == 'GPT2BPETokenizerJp':
+                # TODO for japanese langugae's sentence split: 日文段落的分句：
                 #from nltk.tokenize import RegexpTokenizer
                 jp_sent_splitter = nltk.RegexpTokenizer(u'[^！？。]*[！？。]')
                 Encoder.splitter = jp_sent_splitter
@@ -81,12 +81,12 @@ class Encoder(object):
         else: # 如果不切分句子的话，直接原样返回：
             Encoder.splitter = IdentitySplitter()
 
-    def sent_split(self, text):
-        if args.tokenizer_type == "BertWordPieceJp":
-            # TODO special sentence separator for Japanese language:
-            print('TODO japanese sent split')
-        else:
-            return Encoder.splitter.tokenize(text)
+    #def sent_split(self, text):
+    #    if args.tokenizer_type == "BertWordPieceJp":
+    #        # TODO special sentence separator for Japanese language:
+    #        print('TODO japanese sent split')
+    #    else:
+    #        return Encoder.splitter.tokenize(text)
 
     def encode(self, json_line): # 该方法负责把一行输入的json格式的document(text)分别进行“句子切割”和“word to id"的变换：
         data = json.loads(json_line)
@@ -113,7 +113,9 @@ def get_args():
     #definput = apath + r'\bert_pretrain\small_data_line3.json'
     #vocabfn = apath + r'\bert-large-cased-vocab.txt'
     definput = apath + r'\bert_pretrain\small_data_line_jp.json'
-    vocabfn = r'C:\Users\user\source\repos\megatron\megatron\pretrained\tohoku-u\BERT-base_mecab-ipadic-bpe-32k\vocab.txt'
+    #vocabfn = r'C:\Users\user\source\repos\megatron\megatron\pretrained\tohoku-u\BERT-base_mecab-ipadic-bpe-32k\vocab.txt' # for bert ja
+    vocabfn = r'C:\Users\user\source\repos\gpt2-japanese\ja-bpe.txt' # for gpt-2 ja
+    emojifn = r'C:\Users\user\source\repos\gpt2-japanese\emoji.json'
 
     group.add_argument('--input', type=str, required=False,
                        default=definput,
@@ -131,9 +133,10 @@ def get_args():
 
     group = parser.add_argument_group(title='tokenizer')
     group.add_argument('--tokenizer-type', type=str, required=False,
-                       default='BertWordPieceJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
+                       #default='BertWordPieceJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
+                       default='GPT2BPETokenizerJp', # for japanese gpt2; 'GPT2BPETokenizer' is for english gpt2
                        choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceJp',
-                                'GPT2BPETokenizer'],
+                                'GPT2BPETokenizer', 'GPT2BPETokenizerJp'],
                        help='What type of tokenizer to use.')
     group.add_argument('--vocab-file', type=str, 
                        default=vocabfn,
@@ -142,13 +145,15 @@ def get_args():
                        help='Path to the BPE merge file (if necessary).')
     group.add_argument('--mecab-dict-path', type=str, default=None,
                        help='Path to the dict(ipadict/unidict) of MeCab for Japanese Word Breaker.')
+    group.add_argument('--emoji-file', type=str, default=emojifn, 
+                       help="emoji file for Japanese GPT-2 BPE tokenizer (if necessary)")
     group.add_argument('--append-eod', action='store_true', # 如果没有--append-eod，则表示不增加<eod>
                        help='Append an <eod> token to the end of a document.')
 
 
     group = parser.add_argument_group(title='output data')
     group.add_argument('--output-prefix', type=str, required=False,
-                       default='my-bert-debug',
+                       default='my-gpt2-ja-debug', #'my-bert-ja-debug',
                        help='Path to binary output file without suffix')
     group.add_argument('--dataset-impl', type=str, default='mmap',
                        choices=['lazy', 'cached', 'mmap']) # memory-map?

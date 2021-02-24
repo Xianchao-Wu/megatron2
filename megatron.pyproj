@@ -79,6 +79,8 @@
     <Compile Include="megatron\text_generation_utils.py" />
     <Compile Include="megatron\tokenizer\bert_tokenization_jp.py" />
     <Compile Include="megatron\tokenizer\bert_tokenization.py" />
+    <Compile Include="megatron\tokenizer\build_vocab_bert_jp.py" />
+    <Compile Include="megatron\tokenizer\gpt2_tokenization_jp.py" />
     <Compile Include="megatron\tokenizer\gpt2_tokenization.py" />
     <Compile Include="megatron\tokenizer\tokenizer.py" />
     <Compile Include="megatron\tokenizer\__init__.py" />
@@ -137,13 +139,29 @@
     <Folder Include="tools\openwebtext\" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="examples\evaluate_zeroshot_gpt.sh" />
+    <Content Include="examples\1.generate_samples_gpt_2.sh" />
+    <Content Include="examples\2.evaluate_wikitext_gpt.sh" />
+    <Content Include="examples\3.evaluate_lambada_gpt.sh" />
+    <Content Include="examples\4.evaluate_race_bert_TODO.sh" />
+    <Content Include="examples\5.finetune_race_distributed.sh" />
+    <Content Include="examples\6.pretrain_bert_distributed.sh" />
+    <Content Include="examples\6.pretrain_bert_distributed_bigenfsi.sh" />
+    <Content Include="examples\6.pretrain_bert_distributed_dataprep.sh" />
+    <Content Include="examples\6.pretrain_bert_distributed_dataprep_small.sh" />
+    <Content Include="examples\6.pretrain_bert_distributed_dataprep_small3.sh" />
+    <Content Include="examples\6.pretrain_bert_distributed_small.sh" />
+    <Content Include="examples\6.pretrain_bert_distributed_small3.sh" />
+    <Content Include="examples\7.pretrain_bert_distributed_bigjpfsi.sh" />
+    <Content Include="examples\7.pretrain_bert_distributed_dataprep_jp.sh" />
+    <Content Include="examples\7.runbuildvocab_fsi_jp.sh" />
+    <Content Include="examples\7.runbuildvocab_fsi_jp_part.sh" />
+    <Content Include="examples\8.pretrain_bert_distributed_bigjp_cc100.sh" />
+    <Content Include="examples\8.pretrain_bert_distributed_dataprep_jp_cc100.sh" />
+    <Content Include="examples\8.runbuildvocab_cc100_jp.sh" />
     <Content Include="examples\finetune_mnli_distributed.sh" />
-    <Content Include="examples\finetune_race_distributed.sh" />
     <Content Include="examples\generate_text.sh" />
     <Content Include="examples\merge_mp_bert.sh" />
     <Content Include="examples\pretrain_bert.sh" />
-    <Content Include="examples\pretrain_bert_distributed.sh" />
     <Content Include="examples\pretrain_bert_distributed_with_mp.sh" />
     <Content Include="examples\pretrain_gpt.sh" />
     <Content Include="examples\pretrain_gpt3_175B.sh" />
@@ -172,6 +190,8 @@
     <Content Include="pretrained\bert-large-uncased-vocab.txt" />
     <Content Include="pretrained\gpt2-merges.txt" />
     <Content Include="pretrained\gpt2-vocab.json" />
+    <Content Include="pretrained\gpt2_ja_bpe.txt" />
+    <Content Include="pretrained\gpt2_ja_emoji.json" />
     <Content Include="pretrained\megatron_bert_345m_v0.1_cased.zip" />
     <Content Include="pretrained\megatron_bert_345m_v0.1_uncased.zip" />
     <Content Include="pretrained\megatron_lm_345m_v0.0.zip" />
