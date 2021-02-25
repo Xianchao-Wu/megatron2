@@ -532,6 +532,10 @@ def _add_data_args(parser):
                        help='Path to the vocab file.')
     group.add_argument('--merge-file', type=str, default=None,
                        help='Path to the BPE merge file.')
+    group.add_argument('--emoji-file', type=str, default=None,
+                       help='Path to the emoji file for japanese tokenization.')
+    group.add_argument('--mecab-dict-path', type=str, default=None,
+                       help='Path to the mecab dict (ipadict/unidict) file for japanese tokenization (word breaker).')
     group.add_argument('--seq-length', type=int, default=None,
                        help="Maximum sequence length to process.")
     group.add_argument('--mask-prob', type=float, default=0.15,
