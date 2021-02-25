@@ -340,8 +340,8 @@ class GPT2Tokenizer(object):
         tokens = self.tokenize(text, clean)
         tids = self.convert_tokens_to_ids(tokens)
         textback = self.decode(tids)
-        if True:
-            print('orig.text={}, ids={}, back.text={}'.format(text, tids, textback))
+        #if True: # TODO debug only
+        #    print('orig.text={}, ids={}, back.text={}'.format(text, tids, textback))
         return tids
 
     def decode(self, ids):
