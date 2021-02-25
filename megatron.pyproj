@@ -82,6 +82,7 @@
     <Compile Include="megatron\tokenizer\build_vocab_bert_jp.py" />
     <Compile Include="megatron\tokenizer\gpt2_tokenization_jp.py" />
     <Compile Include="megatron\tokenizer\gpt2_tokenization.py" />
+    <Compile Include="megatron\tokenizer\gpt2_tokenization_jp_mecab.py" />
     <Compile Include="megatron\tokenizer\tokenizer.py" />
     <Compile Include="megatron\tokenizer\__init__.py" />
     <Compile Include="megatron\training.py" />

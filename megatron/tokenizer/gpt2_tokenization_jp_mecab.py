@@ -25,6 +25,10 @@ import os
 import regex as re
 import numpy as np
 from io import open
+import six
+import collections
+
+from .bert_tokenization_jp import MecabBasicTokenizer, WordpieceTokenizer
 
 try:
     from functools import lru_cache
@@ -51,9 +55,71 @@ PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP = {
 # 如下的vocab.json和merges.txt来自：https://huggingface.co/gpt2/tree/main
 # 问题：如何准备其他语言的vocab.json和merges.txt呢？TODO
 VOCAB_NAME = 'vocab.json'
-MERGES_NAME = 'merges.txt' # vocab.json和merges.txt是使用了ByteLevelBPETokenizer，适用于English的gpt-2和roberta，但是中文gpt2,日文gpt2不适用！
+MERGES_NAME = 'merges.txt' 
+# vocab.json和merges.txt是使用了ByteLevelBPETokenizer，适用于English的gpt-2和roberta，但是中文gpt2,日文gpt2不适用！
 SPECIAL_TOKENS_NAME = 'special_tokens.txt'
 
+def convert_to_unicode(text): # Ja can have, OKAY
+    """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
+    if six.PY3: # 返回一个表示当前运行环境是否为python3的boolean值 
+        if isinstance(text, str):
+            return text
+        elif isinstance(text, bytes):
+            return text.decode("utf-8", "ignore") 
+            # errors='ignore', 设置不同的错误处理方案，'strict'的时候，如果编码错误，则会引起一个UnicodeError.
+        else:
+            raise ValueError("Unsupported string type: %s" % (type(text)))
+    elif six.PY2:
+        if isinstance(text, str):
+            return text.decode("utf-8", "ignore")
+        elif isinstance(text, unicode):
+            return text
+        else:
+            raise ValueError("Unsupported string type: %s" % (type(text)))
+    else:
+        raise ValueError("Not running on Python2 or Python 3?")
+
+def load_vocab(vocab_file):
+    """Loads a vocabulary file into a dictionary."""
+    vocab = collections.OrderedDict()
+    index = 0
+    with open(vocab_file, "r", encoding="utf-8") as reader:
+        while True:
+            token = convert_to_unicode(reader.readline().strip())
+            if not token:
+                break # TODO why break? should be 'continue'?
+            token = token.strip()
+            vocab[token] = index
+            index += 1
+    # add 'end of document' here:
+    eot = '<|endoftext|>'
+    if not eot in vocab:
+        vocab[eot] = index
+        index += 1
+    unk = '[UNK]'
+    if not unk in vocab:
+        vocab[unk] = index
+        index += 1
+    return vocab
+
+
+def convert_by_vocab(vocab, items):
+    """Converts a sequence of [tokens|ids] using the vocab."""
+    output = []
+    for item in items:
+        if item in vocab:
+            output.append(vocab[item]) # 问题，vocab是str:id，如果item不在vocab中呢？ TODO
+        else:
+            output.append(vocab['[UNK]'])
+    return output
+
+
+def convert_tokens_to_ids(vocab, tokens):
+    return convert_by_vocab(vocab, tokens)
+
+
+def convert_ids_to_tokens(inv_vocab, ids):
+    return convert_by_vocab(inv_vocab, ids)
 
 @lru_cache()
 def bytes_to_unicode():
@@ -92,58 +158,58 @@ def get_pairs(word):
         prev_char = char
     return pairs
 
+# code reference from : https://github.com/tanreinama/gpt2-japanese
 #Opening C:\Users\user\source\repos\megatron\megatron\pretrained\bert_pretrain\small_data_line_jp.json
-#> building GPT2BPETokenizerJp tokenizer ...
-# > padded vocab (size: 20573) with 35 dummy tokens (new size: 20608)
-#Vocab size: 20573
+#> building GPT2BPETokenizerJpMecab tokenizer ...
+# > padded vocab (size: 28444) with 100 dummy tokens (new size: 28544)
+#Vocab size: 28444
 #Output prefix: my-gpt2-ja-debug
-#Time cost to startup: 0.38977861404418945
-#> building GPT2BPETokenizerJp tokenizer ...
-# > padded vocab (size: 20573) with 35 dummy tokens (new size: 20608)
-#encode str2id: in=<SP>「オタ」とも呼ばれているこのペラナカン（華人）の特製料理は、とてもおいしいスナック料理です。, 
-#  out=[20298, 20262, 5049, 20263, 211, 16050, 529, 19, 537, 16011, 5156, 7684, 15402, 20076, 6561, 20077, 16011, 6408, 406, 17450, 20257, 214, 8413, 1007, 18073, 8184, 813, 406, 3, 20258], 
-#  in.back= 「オタ」とも呼ばれているこのペラナカン（華人）の特製料理は、とてもお いしいスナック料理です。
+#Time cost to startup: 13.938040256500244
+#> building GPT2BPETokenizerJpMecab tokenizer ...
+# > padded vocab (size: 28444) with 100 dummy tokens (new size: 28544)
+#orig.text= 「オタ」とも呼ばれているこのペラナカン（華人）の特製料理は、とてもおいしいスナック料理です。, 
+#  ids=[36, 21577, 38, 13, 28, 501, 20, 16, 33, 70, 1, 23, 1, 24, 5, 24941, 2612, 9, 6, 8567, 7613, 485, 25339, 2612, 2992, 8], 
+#  back.text=['「', 'オタ', '」', 'と', 'も', '呼ば', 'れ', 'て', 'いる', 'この', '[UNK]', '(', '[UNK]', ')', 'の', '特製', '料理', 'は', '、', 'とても', 'おい', '##しい', 'スナック', '料理', 'です', '。']
 
-#encode str2id: in=これは、ココナッツミルクやチリペースト、レモングラス、ガーリックと一緒に魚を砕き、それを、蒸して柔らかくしたバナナの葉に包んで炭火で軽く焼いた料理です。, 
-#  out=[85, 17450, 20257, 2717, 3904, 15046, 1664, 17380, 18729, 4120, 407, 539, 20257, 3313, 553, 455, 20257, 974, 2435, 17380, 17764, 269, 18737, 15227, 17804, 19791, 15707, 20257, 45, 17804, 20257, 19422, 5, 15414, 1200, 1992, 15552, 4958, 15520, 16011, 18685, 18737, 15630, 239, 14797, 15541, 16898, 19341, 16617, 17661, 21, 406, 3, 20258], 
-#  in.back=これは、ココナッツミルクやチリペースト、レモングラス、ガーリックと一緒に魚を砕き、それを、蒸して柔らかくしたバナナの葉に包んで炭火で軽く焼いた料理です。
+#orig.text=これは、ココナッツミルクやチリペースト、レモングラス、ガーリックと一緒に魚を砕き、それを、蒸して柔らかくしたバナナの葉に包んで炭火で軽く焼いた料理です。, 
+#  ids=[171, 9, 6, 15300, 26007, 18262, 49, 9315, 1, 6, 17142, 9563, 6, 6144, 1481, 13, 4265, 7, 2171, 11, 1, 6, 218, 11, 6, 23584, 16, 1, 15, 10, 17140, 5, 2311, 7, 25773, 12, 1, 12, 15883, 16878, 10, 2612, 2992, 8], 
+#  back.text=['これ', 'は', '、', 'ココ', '##ナッツ', 'ミルク', 'や', 'チリ', '[UNK]', '、', 'レモン', 'グラス', '、', 'ガー', '##リック', 'と', '一緒', 'に', '魚', 'を', '[UNK]', '、', 'それ', 'を', '、', '蒸し', 'て', '[UNK]', 'し', 'た', 'バナナ', 'の', '葉', 'に', '包ん', 'で', '[UNK]', 'で', '軽く', '焼い', 'た', '料理', 'です', '。']
 
-#encode str2id: in=このレシピは、アジアの数地域で知られています。, 
-#  out=[7, 2048, 14879, 17450, 20257, 1515, 16398, 16011, 19776, 370, 16898, 16455, 162, 19, 34, 20258], 
-#  in.back=このレシピは、アジアの数地域で知られています。
-#encode str2id: in=「オタオタ（otak<SP>otak<SP>）」は、マレー語で「脳」を意味します。, 
-#  out=[20262, 5049, 5049, 20076, 20241, 20246, 20227, 20237, 20298, 20241, 20246, 20227, 20237, 20298, 20077, 20263, 17450, 20257, 8301, 17119, 15790, 16898, 20262, 19960, 20263, 17804, 551, 67, 15335, 20258], 
-#  in.back=「オタオタ（otak otak ）」は、マレー語で「脳」を意味します。
+#orig.text=このレシピは、アジアの数地域で知られています。, 
+#  ids=[70, 17141, 9, 6, 2185, 5, 276, 535, 12, 742, 20, 16, 21, 2610, 8], 
+#  back.text=['この', 'レシピ', 'は', '、', 'アジア', 'の', '数', '地域', 'で', '知ら', 'れ', 'て', 'い', 'ます', '。']
 
-#encode str2id: in=この「オタオタ」という名前は、この料理の柔らかくトロリとした食感から由来しています。, 
-#  out=[7, 20262, 5049, 5049, 20263, 12, 15498, 500, 17450, 20257, 7, 406, 16011, 15414, 1200, 16617, 1829, 17402, 15, 15552, 4202, 0, 3666, 5, 138, 15335, 20258], 
-#  in.back=この「オタオタ」という名前は、この料理の柔らかくトロリとした食感から由来しています。
+#orig.text=「オタオタ（otak otak ）」は、マレー語で「脳」を意味します。, 
+#  ids=[36, 1, 23, 1, 1, 1108, 9, 6, 5805, 387, 12, 36, 4025, 38, 11, 967, 15, 2610, 8], 
+#  back.text=['「', '[UNK]', '(', '[UNK]', '[UNK]', ') 」', 'は', '、', 'マレー', '語', 'で', '「', '脳', '」', 'を', '意味', 'し', 'ます', '。']
 
-#encode str2id: in=魚を使ったオタオタが、最も一般的ですが、エビやイカ、カニ、魚の頭などを用いたものなど、そのバリエーションは豊富です。, 
-#  out=[15227, 17804, 18888, 17, 5049, 5049, 16090, 20257, 15484, 18325, 873, 15398, 3, 16090, 20257, 4376, 18729, 3401, 20257, 5990, 20257, 15227, 16011, 15014, 18, 17804, 15643, 21, 84, 18, 20257, 4, 3018, 1754, 1049, 15402, 17450, 4026, 3, 20258], 
-#  in.back=魚を使ったオタオタが、最も一般的ですが、エビやイカ、カニ、魚の頭などを用いたものなど、そのバリエーションは豊富です。
-#Processed 1 documents (0.3615 docs/s, 0.0001 MB/s).
+#orig.text=この「オタオタ」という名前は、この料理の柔らかくトロリとした食感から由来しています。, 
+#  ids=[70, 36, 1, 38, 140, 1381, 9, 6, 70, 2612, 5, 1, 1, 13, 15, 10, 761, 832, 40, 1700, 15, 16, 21, 2610, 8], 
+#  back.text=['この', '「', '[UNK]', '」', 'という', '名前', 'は', '、', 'この', '料理', 'の', '[UNK]', '[UNK]', 'と', 'し', 'た', '食', '感', 'から', '由来', 'し', 'て', 'い', 'ます', '。']
+
+#orig.text=魚を使ったオタオタが、最も一般的ですが、エビやイカ、カニ、魚の頭などを用いたものなど、そのバリエーションは豊富です。, 
+#  ids=[2171, 11, 2110, 10, 1, 14, 6, 1113, 654, 81, 2992, 14, 6, 13671, 49, 14693, 6, 15665, 6, 2171, 5, 1177, 64, 11, 585, 10, 120, 64, 6, 59, 11377, 9, 7112, 2992, 8], 
+#  back.text=['魚', 'を', '使っ', 'た', '[UNK]', 'が', '、', '最も', '一般', '的', 'です', 'が', '、', 'エビ', 'や', 'イカ', ' 、', 'カニ', '、', '魚', 'の', '頭', 'など', 'を', '用い', 'た', 'もの', 'など', '、', 'その', 'バリエーション', 'は', '豊富', 'です', '。']
+#Processed 1 documents (0.3381 docs/s, 0.0001 MB/s).
 #Press any key to continue . . .
 
-# code reference from : https://github.com/tanreinama/gpt2-japanese
 class GPT2Tokenizer(object):
     # Usage: self.tokenizer = GPT2TokenizerJp(vocab_file, mecab_dict_path, emoji_file, errors='replace',
     #                                   special_tokens=[], max_len=None)
     def __init__(self, vocab_file, mecab_dict_path=None, emoji_file=None, 
                  errors='replace', special_tokens=[], max_len=None):
         
-        #self.special_tokens = {}
-        #self.special_tokens_decoder = {}
         self.set_special_tokens(special_tokens)
         self.errors = errors
 
-        with open(vocab_file, encoding='utf-8') as f:
-            self.bpe = f.read().split('\n') # self.bpe is a list
+        #with open(vocab_file, encoding='utf-8') as f:
+        #    self.bpe = f.read().split('\n') # self.bpe is a list
 
-        self.encoder = {tokstr:id for id, tokstr in enumerate(self.bpe)}
+        #self.encoder = {tokstr:id for id, tokstr in enumerate(self.bpe)}
+        self.encoder = load_vocab(vocab_file)
         self.decoder = {v:k for k, v in self.encoder.items()}
 
-        self.maxlen = max_len if max_len else np.max([len(w) for w in self.bpe]) #+ self.special_tokens])
+        self.maxlen = max_len if max_len else np.max([len(w) for w in self.encoder]) #+ self.special_tokens])
         if emoji_file:
             with open(emoji_file, encoding='utf-8') as f:
                 self.emoji = json.loads(f.read())
@@ -155,8 +221,11 @@ class GPT2Tokenizer(object):
         self.content_repatter5 = re.compile(r"(明治|大正|昭和|平成|令和)\d{1,2}年(0?[1-9]|1[0-2])月(0?[1-9]|[12][0-9]|3[01])日(\d{1,2}|:|\d{1,2}時|\d{1,2}分|\(日\)|\(月\)|\(火\)|\(水\)|\(木\)|\(金\)|\(土\))*")
         self.content_repatter6 = re.compile(r'((0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*億)*((0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*万)*((0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*千)*(0|[1-9]\d*|[1-9]\d{0,2}(,\d{3})+)*(千円|万円|千万円|円|千ドル|万ドル|千万ドル|ドル|千ユーロ|万ユーロ|千万ユーロ|ユーロ)+(\(税込\)|\(税抜\)|\+tax)*')
 
+        self.basic_tokenizer = MecabBasicTokenizer(mecab_dict_path=mecab_dict_path)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.encoder) # keep using existing method (no change)
+
     def __len__(self):
-        return len(self.bpe) + len(self.special_tokens)
+        return len(self.encoder) + len(self.special_tokens)
 
     def set_special_tokens(self, special_tokens):
         """ Add a list of additional tokens to the encoder.
@@ -182,7 +251,7 @@ class GPT2Tokenizer(object):
         content = self.content_repatter6.sub("<PRICE>" ,content)
         return content
 
-    def encode(self, text, clean=False):
+    def encodeold(self, text, clean=False):
         text = text.replace(' ', '<SP>')
         text = text.replace('　', '<SP>')
         text = text.replace('\r\n', '<BR>')
@@ -217,12 +286,12 @@ class GPT2Tokenizer(object):
                     result.append(self.encoder['<|byte%d|>'%i])
                 pos = end
         # TODO for debug only
-        if True:
-            textback = self.decode(result)
-            print('encode str2id: in={}, out={}, in.back={}'.format(text, result, textback))
+        #if True:
+        #    textback = self.decode(result)
+        #    print('encode str2id: in={}, out={}, in.back={}'.format(text, result, textback))
         return result
 
-    def decode(self, tokens, breakline='\n'):
+    def decodeold(self, tokens, breakline='\n'):
         words = []
         byte_tokens = []
         for i in tokens:
@@ -247,6 +316,37 @@ class GPT2Tokenizer(object):
             words.append(bytearray(byte_tokens).decode('utf-8', errors=self.errors))
         text = ''.join(words)
         return text
+
+    def tokenize(self, text, clean=False):
+        if clean:
+            text = self.clean_text(text)
+        split_tokens = []
+        for token in self.basic_tokenizer.tokenize(text):
+            for sub_token in self.wordpiece_tokenizer.tokenize(token):
+                split_tokens.append(sub_token)
+
+        return split_tokens
+
+    def convert_tokens_to_ids(self, tokens):
+        return convert_by_vocab(self.encoder, tokens)
+
+    def convert_ids_to_tokens(self, ids):
+        return convert_by_vocab(self.decoder, ids)
+
+    def vocab_size(self):
+        return len(self.encoder) + len(self.special_tokens)
+
+    def encode(self, text, clean=False):
+        tokens = self.tokenize(text, clean)
+        tids = self.convert_tokens_to_ids(tokens)
+        textback = self.decode(tids)
+        if True:
+            print('orig.text={}, ids={}, back.text={}'.format(text, tids, textback))
+        return tids
+
+    def decode(self, ids):
+        return self.convert_ids_to_tokens(ids)
+
 
 class GPT2TokenizerOrig(object):
     """

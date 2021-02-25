@@ -63,7 +63,7 @@ class Encoder(object):
             if not nltk_available:
                 print("NLTK is not available to split sentences.")
                 exit()
-            if self.args.tokenizer_type == "BertWordPieceJp" or self.args.tokenizer_type == 'GPT2BPETokenizerJp':
+            if self.args.tokenizer_type == "BertWordPieceJp" or self.args.tokenizer_type.startswith('GPT2BPETokenizerJp'):
                 # TODO for japanese langugae's sentence split: 日文段落的分句：
                 #from nltk.tokenize import RegexpTokenizer
                 jp_sent_splitter = nltk.RegexpTokenizer(u'[^！？。]*[！？。]')
@@ -96,7 +96,9 @@ class Encoder(object):
             doc_ids = []
             for sentence in Encoder.splitter.tokenize(text): # TODO 重要，这里进行句子级别的切割，日语需要特别处理！
                 #for sentence in sent_split(text):
-                sentence_ids = Encoder.tokenizer.tokenize(sentence) # TODO 重要，这里进行从一个字符串句子到一个ids构成的句子之间的变换
+                sentence_ids = Encoder.tokenizer.tokenize(sentence) 
+                # TODO 重要，这里进行从一个字符串句子到一个ids构成的句子之间的变换
+
                 #print('sent_ids={}'.format(sentence_ids))
                 if len(sentence_ids) > 0:
                     doc_ids.append(sentence_ids)
@@ -113,7 +115,8 @@ def get_args():
     #definput = apath + r'\bert_pretrain\small_data_line3.json'
     #vocabfn = apath + r'\bert-large-cased-vocab.txt'
     definput = apath + r'\bert_pretrain\small_data_line_jp.json'
-    #vocabfn = r'C:\Users\user\source\repos\megatron\megatron\pretrained\tohoku-u\BERT-base_mecab-ipadic-bpe-32k\vocab.txt' # for bert ja
+    #vocabfn = r'C:\Users\user\source\repos\megatron\megatron\pretrained\tohoku-u\BERT-base_mecab-ipadic-bpe-32k\vocab.txt' 
+    # for bert ja
     vocabfn = r'C:\Users\user\source\repos\gpt2-japanese\ja-bpe.txt' # for gpt-2 ja
     emojifn = r'C:\Users\user\source\repos\gpt2-japanese\emoji.json'
 
@@ -136,7 +139,7 @@ def get_args():
                        #default='BertWordPieceJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
                        default='GPT2BPETokenizerJp', # for japanese gpt2; 'GPT2BPETokenizer' is for english gpt2
                        choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceJp',
-                                'GPT2BPETokenizer', 'GPT2BPETokenizerJp'],
+                                'GPT2BPETokenizer', 'GPT2BPETokenizerJp', 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
     group.add_argument('--vocab-file', type=str, 
                        default=vocabfn,
