@@ -547,7 +547,7 @@ def _add_data_args(parser):
     group.add_argument('--num-workers', type=int, default=2,
                        help="Dataloader number of workers.")
     group.add_argument('--tokenizer-type', type=str,
-                       default=None,
+                       default='GPT2BPETokenizer',
                        choices=['BertWordPieceLowerCase',
                                 'BertWordPieceCase',
                                 'BertWordPieceCaseJp',

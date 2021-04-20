@@ -144,6 +144,6 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
 if __name__ == "__main__":
 
     pretrain(train_valid_test_datasets_provider, model_provider, forward_step,
-             args_defaults={'tokenizer_type': 'GPT2BPETokenizerJp',
-                            # 'GPT2BPETokenizerJp' for japanese gpt2, and 'GPT2BPETokenizer' for japanese bert
+             args_defaults={'tokenizer_type': 'GPT2BPETokenizer',
+                            # 'GPT2BPETokenizerJp' for japanese gpt2, and 'GPT2BPETokenizer' for english gpt2
                             'scaled_upper_triang_masked_softmax_fusion': True})
