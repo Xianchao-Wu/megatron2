@@ -217,9 +217,9 @@ class GPT2Tokenizer(object):
                     result.append(self.encoder['<|byte%d|>'%i])
                 pos = end
         # TODO for debug only
-        if True:
-            textback = self.decode(result)
-            print('encode str2id: in={}, out={}, in.back={}'.format(text, result, textback))
+        #if True:
+        #    textback = self.decode(result)
+        #    print('encode str2id: in={}, out={}, in.back={}'.format(text, result, textback))
         return result
 
     def decode(self, tokens, breakline='\n'):
