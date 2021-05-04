@@ -19,7 +19,8 @@ from megatron import get_args
 from megatron import print_rank_0
 from megatron import get_tokenizer
 from megatron import mpu
-from megatron.model.multiple_choice import MultipleChoice, MultipleChoiceFirstStage, MultipleChoiceIntermediateStage, MultipleChoiceLastStage
+from megatron.model.multiple_choice import MultipleChoice, MultipleChoiceFirstStage, \
+    MultipleChoiceIntermediateStage, MultipleChoiceLastStage
 from tasks.eval_utils import accuracy_func_provider
 from tasks.finetune_utils import finetune
 from tasks.race.data import RaceDataset

@@ -126,7 +126,9 @@ class ParallelSelfAttention(MegatronModule):
         self.fp16 = args.fp16
 
         self.attention_mask_func = attention_mask_func
-        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling # bool：apply (or not) scale Q * K^T by 1 / layer-number
+        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling 
+        # bool：apply (or not) scale Q * K^T by 1 / layer-number
+
         self.attention_softmax_in_fp32 = args.attention_softmax_in_fp32
         if self.apply_query_key_layer_scaling:
             self.attention_softmax_in_fp32 = True
@@ -224,6 +226,7 @@ class ParallelSelfAttention(MegatronModule):
         # np=每个gpu上head的数量, hn=每个head的隐层维度，np*3*hn=3h/p是一个gpu上的！
         # 不应该在这里的啊！这里的应该是3h作为输出的维度 TODO-okay（这里是“总调度”，不是各个gpu上的并行）
         # n/p * 3 * h/n = 3h/p finally (is actually for one gpu's hidden dimension!)
+        # 纵刀流：三个linear layer都是纵刀流
         mixed_x_layer, _ = self.query_key_value(hidden_states) # from h to 3h，这里还是整体的变换（非也，是h -> 3h/p）
         # TODO-okay 等待确认，实际输出的是3h/p，也就是说，是一个gpu上的！[确认]
 
@@ -243,7 +246,7 @@ class ParallelSelfAttention(MegatronModule):
         mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
 
         # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]， 每个gpu上的head的个数，之后是每个head对应的隐层的维度
-        # 也就是说，head的数量，应该>= GPU的数量！如果head的数量
+        # 也就是说，head的数量，应该>= GPU的数量！
         (query_layer,
          key_layer,
          value_layer) = mpu.split_tensor_along_last_dim(mixed_x_layer, 3) # 按照最后一列维度，三等分
@@ -351,7 +354,8 @@ class ParallelSelfAttention(MegatronModule):
                                                output_size[2], -1)
         
         # matmul: [b*np, sq, sk] * [b*np, sk, hn] -> [b * np, sq, hn]
-        context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1)) # TODO-okay important , X*V^T
+        context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1)) 
+        # TODO-okay important , X*V^T
         # where X = softmax(Q*K^T/scalar_for_scale)
 
         # change view [b, np, sq, hn]
@@ -596,22 +600,28 @@ class ParallelTransformer(MegatronModule):
             # Data format change to avoid explicit tranposes : [b s h] --> [s b h].
             # If the input flag for fp32 residual connection is set, convert for float.
             if self.fp32_residual_connection:
-                hidden_states = hidden_states.transpose(0, 1).contiguous().float() # possibly from fp16 to fp32
+                hidden_states = hidden_states.transpose(0, 1).contiguous().float() 
+            # possibly from fp16 to fp32
             # Otherwise, leave it as is.
             else:
                 hidden_states = hidden_states.transpose(0, 1).contiguous()
 
-        if self.checkpoint_activations:
+        if self.checkpoint_activations: 
+            # 另外一种模型并行的方法 (Chen, T., Xu, B., Zhang, C., and Guestrin, C. Training
+            # deep nets with sublinear memory cost. CoRR,
+            # abs/1604.06174, 2016. URL http://arxiv:org/abs/1604:06174.)
             hidden_states = self._checkpointed_forward(hidden_states,
                                                        attention_mask)
         else:
             if get_key_value:
                 presents = []
             for index in range(self.num_layers):
-                layer = self._get_layer(index)
+                layer = self._get_layer(index) # return self.layers[layer_number]
                 past = None
                 if layer_past is not None:
                     past = layer_past[index]
+
+                ### 调用ParallelTransformerLayer的forward函数：###
                 hidden_states = layer(hidden_states,
                                       attention_mask,
                                       layer_past=past,
@@ -621,7 +631,8 @@ class ParallelTransformer(MegatronModule):
                     presents.append(present)
         
         # Final layer norm.
-        if mpu.is_pipeline_last_stage(): # 即当前gpu的rank = world_size - 1! 也就是说当前的gpu是"gpu并行群组"的最后一个
+        if mpu.is_pipeline_last_stage(): 
+            # 即当前gpu的rank = world_size - 1! 也就是说当前的gpu是"gpu并行群组"的最后一个
             # defined in megatron/mpu/initialize.py
             # Reverting data format change [s b h] --> [b s h].
             hidden_states = hidden_states.transpose(0, 1).contiguous()

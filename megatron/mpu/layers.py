@@ -34,10 +34,12 @@ from .initialize import get_tensor_model_parallel_world_size #
 # 张量-并行群组中的gpu的数量 (例如，2，类似于对一个张量进行上下切割成两份)
 # 2. alike from [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
 
-from .mappings import copy_to_tensor_model_parallel_region # “复制-全归约”
-from .mappings import gather_from_tensor_model_parallel_region # “拼凑-切割”
-from .mappings import reduce_from_tensor_model_parallel_region # “全归约-复制”
-from .mappings import scatter_to_tensor_model_parallel_region # "切割-拼凑"
+from .mappings import copy_to_tensor_model_parallel_region # “forward复制-backward全归约” - 纵刀流的f (column parallel linear layer)
+from .mappings import gather_from_tensor_model_parallel_region # “forward拼凑-back切割” - 纵刀流的g (column parallel linear layer)
+
+from .mappings import scatter_to_tensor_model_parallel_region # "forward切割-backward拼凑" - 横刀流的f (row parallel linear layer)
+from .mappings import reduce_from_tensor_model_parallel_region # “forward全归约-backward复制” - 横刀流的g (row parallel linear layer)
+
 from .random import get_cuda_rng_tracker # rng=random number generator 跟踪仪
 from .utils import divide
 from .utils import split_tensor_along_last_dim
@@ -158,8 +160,10 @@ class VocabParallelEmbedding(torch.nn.Module):
         # e.g., self.tensor_model_parallel_size=2
         # Divide the weight matrix along the vocabulary dimension.
         self.vocab_start_index, self.vocab_end_index = \
-            VocabUtility.vocab_range_from_global_vocab_size( # 当前rank的gpu所覆盖的子词表index: [index_first, index_last)
-                self.num_embeddings, get_tensor_model_parallel_rank(), # 当前gpu在其所在的并行群组中的rank
+            VocabUtility.vocab_range_from_global_vocab_size( 
+                # 当前rank的gpu所覆盖的子词表index: [index_first, index_last)
+                self.num_embeddings, get_tensor_model_parallel_rank(), 
+                # 当前gpu在其所在的并行群组中的rank
                 self.tensor_model_parallel_size)
         self.num_embeddings_per_partition = self.vocab_end_index - \
             self.vocab_start_index # 一个gpu上负责的单词的数量
@@ -181,6 +185,7 @@ class VocabParallelEmbedding(torch.nn.Module):
                                           partition_dim=0, stride=1)
 
     def forward(self, input_):
+        # input_ 取值和单词在词表中的绝对序号有关系
         if self.tensor_model_parallel_size > 1: # 当前并行群组中gpu的数量
             # Build the mask.
             input_mask = (input_ < self.vocab_start_index) | \
@@ -189,7 +194,7 @@ class VocabParallelEmbedding(torch.nn.Module):
             masked_input = input_.clone() - self.vocab_start_index # TODO 为什么这里要-self.vocab_start_index?
             masked_input[input_mask] = 0
             # example, [1,2,3,4] = vocab; current gpu's [1,2]
-            # input_=[3,2,4,1,2]
+            # input_=[3,2,4,1,2] （单词的id序号）
             # input_mask=[True, False, True, False, False]
             # masked_input = [3,2,4,1,2] - 1 = [2,1,3,0,1]
             # masked_input = [0,1,0,0,1]??? -> 没有关系的！参看output_parallel[input_mask, :]=0.0
@@ -249,7 +254,7 @@ class ColumnParallelLinear(torch.nn.Module):
         # Keep input parameters
         self.input_size = input_size # h=hidden_size of transformer
         self.output_size = output_size # 4*h
-        self.gather_output = gather_output # True or False
+        self.gather_output = gather_output # True (纵刀流线性层独立使用) or False (作为MLP的第一个线性层使用)
         # Divide the weight matrix along the last dimension.
         world_size = get_tensor_model_parallel_world_size() # 当前并行群组中gpu的个数
         self.output_size_per_partition = divide(output_size, world_size) # 每个“划分”上的output的维度大小, 4h/p
@@ -298,31 +303,39 @@ class ColumnParallelLinear(torch.nn.Module):
 
     def forward(self, input_):
         # Set up backprop all-reduce. 输入的是整体h，输出的是4h/p被按照gpu分割之后的！
-        input_parallel = copy_to_tensor_model_parallel_region(input_) # 前向复制，后向全归约（论文中的Figure 3.a中的f）
+        # “forward复制-backward全归约” - 纵刀流的f (column parallel linear layer)
+        input_parallel = copy_to_tensor_model_parallel_region(input_) 
+        # 前向复制identity，后向全归约all-reduce（论文中的Figure 3.a中的f）
         # 原因：X在多个GPU上被简单复制（没有进行任何切割），类似X -> f -> [X, X, ..., X]
-        # 这样的话，反向的时候，就是多个gpu上的X的整体，通过all_reduce合并到一起（例如相加然后平均，或者直接element-wise相加）
+        # 这样的话，反向的时候，就是多个gpu上的X的整体，
+        # 通过all_reduce合并到一起（例如相加然后平均，或者直接element-wise相加 -> 这里是使用element-wise相加）
         # Matrix multiply.
 
         bias = self.bias if not self.skip_bias_add else None # 当不“忽略bias”的时候，带上self.bias
-        output_parallel = F.linear(input_parallel, self.weight, bias) # import torch.nn.functional as F
+        output_parallel = F.linear(input_parallel, self.weight, bias) 
+        # import torch.nn.functional as F
         # X * A_i^T = (b, s, h) * (h, 4h/p) = (b, s, 4h/p) = output_parallel
 
-        if self.gather_output:
+        if self.gather_output: # 作为[[独立的]]'column parallel linear layer'所需要的g函数，即forward使用all-gather：
             # All-gather across the partitions.
-            output = gather_from_tensor_model_parallel_region(output_parallel) # 前向拼凑，后向切割
+            # “forward拼凑-back切割” - 纵刀流的g (column parallel linear layer)
+            output = gather_from_tensor_model_parallel_region(output_parallel) 
+            # 前向拼凑，后向切割
             # 前向把各个GPU上的Y_i，进行拼凑，得到Y；即，从(b, s, 4h/p)拼凑到(b, s, 4h)的过程。
             # 后向的时候，把Y按照GPU的数量，进行切割，并送回到各个GPU。即，从(b, s, 4h)切割到(b, s, 4h/p)的过程。
         else:
-            output = output_parallel # TODO 注意，如果不gather，则实际在这里输出的是4h/p，是一个gpu上的结果！而不是整体的4h!
+            output = output_parallel 
+            # 当前的'column parallel linear layer'作为GPU并行Transformer中的MLP的一部分的时候的用法：
+            # TODO 注意，如果不gather，则实际在这里输出的是4h/p，是一个gpu上的结果！而不是整体的4h!
             # 这个部分非常重要，有助于理解selfattention中的每个tensor的维度！
         output_bias = self.bias if self.skip_bias_add else None
         return output, output_bias
 
 
 class RowParallelLinear(torch.nn.Module):
-    """Linear layer with row parallelism (参数按照行，切分并行).
+    """Linear layer with row parallelism (参数按照行，切分并行). 横刀流
 
-    The linear layer is defined as Y = XA + b （X=输入tensor, A=可训练参数, b=bias；Y=输出tensor）. 
+    The linear layer is defined as Y = XA + b （X=输入tensor, A=可训练参数，权重矩阵, b=bias；Y=输出tensor）. 
     A is parallelized along its first dimension and X along its second (final, possibly not second!!!) dimension as:
                -   -
               | A_1 |
@@ -345,7 +358,7 @@ class RowParallelLinear(torch.nn.Module):
                                      set to False. It returns the master weights
                                      used for initialization.
         skip_bias_add: This was added to enable performance optimations where bias
-                       can be fused with other elementwise operations. we skip 
+                       can be fused with (熔合) other elementwise operations. we skip 
                        adding bias but instead return it.
     """
 
@@ -357,7 +370,7 @@ class RowParallelLinear(torch.nn.Module):
         super(RowParallelLinear, self).__init__()
 
         # Keep input parameters
-        self.input_size = input_size # 例如，4*hidden_size of transformer = 4*h
+        self.input_size = input_size # 例如，4*hidden_size of transformer = 4*h (MLP的第二个linear layer)
         self.output_size = output_size # 例如，hidden_size of transformer = h
         self.input_is_parallel = input_is_parallel
         # Divide the weight matrix along the last dimension.
@@ -404,9 +417,11 @@ class RowParallelLinear(torch.nn.Module):
 
     def forward(self, input_):
         # Set up backprop all-reduce. 输入的tensor是被分割到每个gpu的，输出的tensor是整体all-reduce之后的！
-        if self.input_is_parallel:
+        if self.input_is_parallel: # Transformer's MLP使用这个部分:
             input_parallel = input_
-        else:
+        else: 
+            # 作为[[独立的]]row parallel线性层，使用这个部分：
+            # "forward切割-backward拼凑" - 横刀流的f (row parallel linear layer)
             input_parallel = scatter_to_tensor_model_parallel_region(input_) # 前向切割，后向拼凑
             # 如果有必要，先把输入inputs_=X按照?（应该是最后一列，即4h -> 4h/p）切割，按照gpu的数量。
             # 得到的是X_1, ..., X_p这样的，shape是?
@@ -420,7 +435,8 @@ class RowParallelLinear(torch.nn.Module):
         # 然后经过线性层，从4h/p维度，被映射成了h维度。所以，最后的输出是(b, s, h).
 
         # All-reduce across all the partitions. [g function in Figure 3(a)]
-        output_ = reduce_from_tensor_model_parallel_region(output_parallel) 
+        # “forward全归约-backward复制” - 横刀流的g (row parallel linear layer)
+        output_ = reduce_from_tensor_model_parallel_region(output_parallel) # 
         # 前向全归约，后向复制(Figure 3(a) right-hand-side)
         # 对每个gpu上的(b, s, h)进行all_reduce，叠加（求平均），然后得到的是(b, s, h)，每个gpu上面都保持了最新的结果。
 

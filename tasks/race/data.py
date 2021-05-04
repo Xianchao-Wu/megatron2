@@ -15,7 +15,6 @@ from tasks.data_utils import clean_text
 NUM_CHOICES = 4
 MAX_QA_LENGTH = 128
 
-
 class RaceDataset(Dataset):
 
     def __init__(self, dataset_name, datapaths, tokenizer, max_seq_length,

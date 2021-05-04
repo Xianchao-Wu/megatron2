@@ -19,7 +19,8 @@ from megatron import get_args
 from megatron import print_rank_0
 from megatron import get_tokenizer
 from megatron import mpu
-from megatron.model.classification import Classification, ClassificationFirstStage, ClassificationIntermediateStage, ClassificationLastStage
+from megatron.model.classification import Classification, ClassificationFirstStage, \
+    ClassificationIntermediateStage, ClassificationLastStage
 from tasks.eval_utils import accuracy_func_provider
 from tasks.finetune_utils import finetune
 
