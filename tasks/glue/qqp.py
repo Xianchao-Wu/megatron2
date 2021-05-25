@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""QQP dataset."""
+"""QQP=Quora Question Pairs dataset. a binary classification task where the goal is to 
+determine if two questions asked on Quora are semantically equalent"""
 
 from megatron import print_rank_0
 from tasks.data_utils import clean_text
 from .data import GLUEAbstractDataset
 
 
-LABELS = [0, 1]
+LABELS = [0, 1] # 二分类
 
 
 class QQPDataset(GLUEAbstractDataset):
@@ -37,14 +38,19 @@ class QQPDataset(GLUEAbstractDataset):
 
         samples = []
         total = 0
-        first = True
+        first = True # first row
         is_test = False
         with open(filename, 'r') as f:
             for line in f:
                 row = line.strip().split('\t')
-                if first:
+                if first: # for first row (title)
                     first = False
                     if len(row) == 3:
+                        # "test_id","question1","question2"
+                        # 0,
+                        # "How does the Surface Pro himself 4 compare with iPad Pro?",
+                        # "Why did Microsoft choose core m3 and not core i3 home Surface Pro 4?"
+
                         is_test = True
                         print_rank_0('   reading {}, {}, and {} columns and '
                                      'setting labels to {}'.format(
@@ -52,6 +58,12 @@ class QQPDataset(GLUEAbstractDataset):
                                          row[2].strip(), self.test_label))
                     else:
                         assert len(row) == 6
+                        # Train dataset: "id","qid1","qid2","question1","question2","is_duplicate"
+                        # C:\Users\user\Desktop\emnlp2021-finmegatron\qqp-quora-question-pairs\train.csv
+                        # "0","1","2",
+                        # "What is the step by step guide to invest in share market in india?",
+                        # "What is the step by step guide to invest in share market?",
+                        # "0" # -> label
                         print_rank_0('    reading {}, {}, {}, and {} columns'
                                      ' ...'.format(
                                          row[0].strip(), row[3].strip(),
@@ -63,7 +75,7 @@ class QQPDataset(GLUEAbstractDataset):
                     uid = int(row[0].strip())
                     text_a = clean_text(row[1].strip())
                     text_b = clean_text(row[2].strip())
-                    label = self.test_label
+                    label = self.test_label # default value?
                     assert len(text_a) > 0
                     assert len(text_b) > 0
                 else:
@@ -71,7 +83,7 @@ class QQPDataset(GLUEAbstractDataset):
                         uid = int(row[0].strip())
                         text_a = clean_text(row[3].strip())
                         text_b = clean_text(row[4].strip())
-                        label = int(row[5].strip())
+                        label = int(row[5].strip()) # reference label
                     else:
                         print_rank_0('***WARNING*** index error, '
                                      'skipping: {}'.format(row))

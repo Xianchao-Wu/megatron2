@@ -65,7 +65,7 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
         1) initialize Megatron.
         2) setup model, optimizer and lr schedule using the model_provider.
         3) call train_val_test_data_provider to get train/val/test datasets.
-        4) train the modle using the forward_step_func.
+        4) train the model using the forward_step_func.
 
     Arguments:
         train_valid_test_dataset_provider: a function that takes the size of
@@ -86,11 +86,12 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     # Initalize and get arguments, timers, and Tensorboard writer.
     initialize_megatron(extra_args_provider=extra_args_provider,
                         args_defaults=args_defaults)
+    # TODO 没有返回的参数？
 
     # Adjust the startup time so it reflects the largest value.
     # This will be closer to what scheduler will see (outside of
     # image ... launches.
-    global _TRAIN_START_TIME
+    global _TRAIN_START_TIME # TODO 问题：为何_TRAIN_START_TIME不是在'initialize_megatron'函数的前面？
     start_time_tensor = torch.cuda.FloatTensor([_TRAIN_START_TIME])
     torch.distributed.all_reduce(start_time_tensor,
                                  op=torch.distributed.ReduceOp.MIN)
@@ -204,7 +205,7 @@ def get_model(model_provider_func):
     if args.fp16:
         model = FP16Module(model)
 
-    if args.DDP_impl == 'torch':
+    if args.DDP_impl == 'torch': # DDP=distributed data parallel=分布式数据并行
         i = torch.cuda.current_device()
         model = torchDDP(model, device_ids=[i], output_device=i,
                          process_group=mpu.get_data_parallel_group())
@@ -300,6 +301,7 @@ def setup_model_and_optimizer(model_provider_func):
         print("Initializing ICT from pretrained BERT model", flush=True)
         unwrapped_model.init_state_dict_from_bert()
 
+    # TODO 给unwrapped_model赋值了半天，为啥没有最后返回它呢？
     return model, optimizer, lr_scheduler
 
 
@@ -985,9 +987,9 @@ def build_train_valid_test_data_iterators(
                                       eval_iters * args.global_batch_size,
                                       test_iters * args.global_batch_size]
         print_rank_0(' > datasets target sizes (minimum size):')
-        print_rank_0('    train:      {}'.format(train_val_test_num_samples[0]))
-        print_rank_0('    validation: {}'.format(train_val_test_num_samples[1]))
-        print_rank_0('    test:       {}'.format(train_val_test_num_samples[2]))
+        print_rank_0('    train:      {}'.format(train_val_test_num_samples[0])) # e.g., 32,000,000
+        print_rank_0('    validation: {}'.format(train_val_test_num_samples[1])) # e.g., 64,320
+        print_rank_0('    test:       {}'.format(train_val_test_num_samples[2])) # e.g., 320
 
         # Build the datasets.
         train_ds, valid_ds, test_ds = build_train_valid_test_datasets_provider(

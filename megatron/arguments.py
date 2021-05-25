@@ -99,6 +99,9 @@ def parse_args(extra_args_provider=None, defaults={},
     assert args.micro_batch_size > 0
     if args.global_batch_size is None:
         args.global_batch_size = args.micro_batch_size * args.data_parallel_size
+        # TODO 为什么是这样计算global_batch_size呢？
+        # e.g., micro_batch_size=4, data_parallel_size=8
+        # single-node的时候，类似于8 gpus, 每个gpu上的batch size=4?
         if args.rank == 0:
             print('setting global batch size to {}'.format(
                 args.global_batch_size), flush=True)
@@ -113,8 +116,8 @@ def parse_args(extra_args_provider=None, defaults={},
               flush=True)
 
     # Consumed tokens.
-    args.consumed_train_samples = 0
-    args.consumed_valid_samples = 0
+    args.consumed_train_samples = 0 # 不是从命令行得到的值！
+    args.consumed_valid_samples = 0 # 取值无法从命令行获得！
 
     # Set input defaults.
     for key in defaults:
@@ -130,8 +133,9 @@ def parse_args(extra_args_provider=None, defaults={},
         else:
             setattr(args, key, defaults[key])
 
+    # 问题：下面的iteration-based training和sample-based training是什么区别？
     # Iteration-based training.
-    if args.train_iters:
+    if args.train_iters: # 例如, train_iters=1,000,000
         # If we use iteration-based training, make sure the
         # sample-based options are off.
         assert args.train_samples is None, \
@@ -163,11 +167,12 @@ def parse_args(extra_args_provider=None, defaults={},
     # Check required arguments.
     required_args = ['num_layers', 'hidden_size', 'num_attention_heads',
                      'max_position_embeddings']
+    # e.g., num_layers=24, hidden_size=1024, num_attention_heads=16, max_position_embeddings=512 or 1024
     for req_arg in required_args:
         _check_arg_is_not_none(args, req_arg)
 
     # Checks.
-    assert args.hidden_size % args.num_attention_heads == 0
+    assert args.hidden_size % args.num_attention_heads == 0 # 1024/16=64
     if args.seq_length is not None:
         assert args.max_position_embeddings >= args.seq_length
     if args.lr is not None:
@@ -188,6 +193,7 @@ def parse_args(extra_args_provider=None, defaults={},
             'need to enable checkpoint-activations'
 
     if args.scaled_masked_softmax_fusion:
+        # TODO for what?
         if args.scaled_upper_triang_masked_softmax_fusion:
             fused_kernels.load_scaled_upper_triang_masked_softmax_fusion_kernel()
         else:
@@ -214,7 +220,7 @@ def _print_args(args):
         for arg in vars(args):
             dots = '.' * (48 - len(arg))
             str_list.append('  {} {} {}'.format(arg, dots, getattr(args, arg)))
-        for arg in sorted(str_list, key=lambda x: x.lower()):
+        for arg in sorted(str_list, key=lambda x: x.lower()): # 按照字母顺序打印
             print(arg, flush=True)
         print('-------------------- end of arguments ---------------------',
               flush=True)
@@ -245,6 +251,7 @@ def _add_network_size_args(parser):
                        action='store_true',
                        help='If set, use original BERT residula connection '
                        'ordering.')
+    # BERT中是先residual connection再layer norm? -> 是Add & Norm，先residual add-up，再layer.norm!
     group.add_argument('--openai-gelu', action='store_true',
                        help='Use OpenAIs GeLU implementation. This option'
                        'should not be used unless for backward compatibility' # 兼容性
@@ -283,9 +290,10 @@ def _add_training_args(parser):
     group = parser.add_argument_group(title='training')
 
     group.add_argument('--micro-batch-size', type=int, default=None,
-                       help='Batch size per model instance (local batch size). '
+                       help='Batch size per model instance (local batch size). ' # 每个模型（整体）的batch size
                        'Global batch size is local batch size times data '
                        'parallel size times number of micro batches.')
+    # global batch size = 每个模型的batch size * data parallel size * 模型的个数
     group.add_argument('--batch-size', type=int, default=None,
                        help='Old batch size parameter, do not use. '
                        'Use --micro-batch-size instead')

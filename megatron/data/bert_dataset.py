@@ -37,6 +37,7 @@ class BertDataset(Dataset):
     def __init__(self, name, indexed_dataset, data_prefix,
                  num_epochs, max_num_samples, masked_lm_prob,
                  max_seq_length, short_seq_prob, seed):
+        # short_seq_prob = prob of producing a short sequence 多短算是short sequence?
 
         # Params to store.
         self.name = name
@@ -48,6 +49,7 @@ class BertDataset(Dataset):
         self.indexed_dataset = indexed_dataset
 
         # Build the samples mapping.
+        # 从硬盘文件读取：
         self.samples_mapping = get_samples_mapping_(self.indexed_dataset,
                                                     data_prefix,
                                                     num_epochs,
@@ -70,6 +72,8 @@ class BertDataset(Dataset):
         return self.samples_mapping.shape[0]
 
     def __getitem__(self, idx):
+        # 根据idx，读取self.samples_mapping里面的索引信息，
+        # 并从indexed_dataset中读取sample，然后构造sample
         start_idx, end_idx, seq_length = self.samples_mapping[idx]
         sample = [self.indexed_dataset[i] for i in range(start_idx, end_idx)]
         # Note that this rng state should be numpy and not python since
@@ -77,13 +81,13 @@ class BertDataset(Dataset):
         np_rng = np.random.RandomState(seed=(self.seed + idx))
         return build_training_sample(sample, seq_length,
                                      self.max_seq_length,  # needed for padding
-                                     self.vocab_id_list,
+                                     self.vocab_id_list, # 20%不用[mask]的时候，其中50%使用其他的piece (使用vocab_id_list)，50%不变
                                      self.vocab_id_to_token_dict,
                                      self.cls_id, self.sep_id,
                                      self.mask_id, self.pad_id,
                                      self.masked_lm_prob, np_rng)
 
-
+# 从硬盘读取信息：
 def get_samples_mapping_(indexed_dataset,
                          data_prefix,
                          num_epochs,
@@ -168,7 +172,7 @@ def get_samples_mapping_(indexed_dataset,
 
     return samples_mapping
 
-
+# 根据读取的原始json的信息，构造一个训练sample样本：
 def build_training_sample(sample,
                           target_seq_length, max_seq_length,
                           vocab_id_list, vocab_id_to_token_dict,
@@ -191,42 +195,56 @@ def build_training_sample(sample,
         np_rng: Random number genenrator. Note that this rng state should be
               numpy and not python since python randint is inclusive for
               the opper bound whereas the numpy one is exclusive.
+              应该是来自numpy的，上界开；
+              如果是来自python自己的话，是上界闭。
     """
 
-    # We assume that we have at least two sentences in the sample
+    # step 0: (check) We assume that we have at least two sentences in the sample
     assert len(sample) > 1
     assert target_seq_length <= max_seq_length
 
-    # Divide sample into two segments (A and B).
+    # step 1: (切割，segment-order prediction）Divide sample into two segments (A and B). 
+    # 如果sample中句子过多，则合并句子
+    # 潜在的问题：tokens_a和tokens_b的分别的长度，以及他们的distance，没有预期：
+    # is_next_random=True，表示tokens_a和tokens_b在原文段落中的出现顺序被互换了.
+    # is_next_random=False，表示保持了原本在原文段落中的顺序。
     tokens_a, tokens_b, is_next_random = get_a_and_b_segments(sample, np_rng)
 
-    # Truncate to `target_sequence_length`.
+    # step 2: (截断) Truncate to `target_sequence_length`.
     max_num_tokens = target_seq_length
     truncated = truncate_segments(tokens_a, tokens_b, len(tokens_a),
                                   len(tokens_b), max_num_tokens, np_rng)
 
-    # Build tokens and toketypes.
+    # step 3: (片段类型) Build tokens and toketypes.
+    # [CLS] segment1 [SEP] segment2 [SEP] = tokens (in id)
+    # 0     0        0     1        1     = token types
     tokens, tokentypes = create_tokens_and_tokentypes(tokens_a, tokens_b,
                                                       cls_id, sep_id)
 
-    # Masking.
+    # step 4: (MLM) Masking.
     max_predictions_per_seq = masked_lm_prob * max_num_tokens
     (tokens, masked_positions, masked_labels, _) = create_masked_lm_predictions(
         tokens, vocab_id_list, vocab_id_to_token_dict, masked_lm_prob,
         cls_id, sep_id, mask_id, max_predictions_per_seq, np_rng)
 
-    # Padding.
+    # step 5: Padding.
+    # 1. tokens_np: 打上了补丁之后的tokens（也被mask了，以及可能的permutation了）
+    # 2. tokentypes_np: 打上了补丁之后的tokentypes（0/[cls] 0/segment1 0/[sep] 1/segment2 1/[sep] 而后是0)
+    # 3. labels_np: 缺省值为-1，如果一个i位置的piece被mask了，则其labels[i]=原始的token id
+    # 4. padding_mask_np: 如果是补丁，取0；否则取1
+    # 5. loss_mask_np: 缺省值为0，如果一个i位置的piece被mask了，则其loss_mask[i]=1
     tokens_np, tokentypes_np, labels_np, padding_mask_np, loss_mask_np \
         = pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
                                    masked_labels, pad_id, max_seq_length)
 
+    # step 6: 最后组装
     train_sample = {
         'text': tokens_np,
         'types': tokentypes_np,
         'labels': labels_np,
-        'is_random': int(is_next_random),
+        'is_random': int(is_next_random), # is_next_random=1 if a,b两个segments进行了互换; 0 otherwise
         'loss_mask': loss_mask_np,
         'padding_mask': padding_mask_np,
-        'truncated': int(truncated)}
+        'truncated': int(truncated)} # 1代表sequence被截取了；0代表没有被截取
     return train_sample
 

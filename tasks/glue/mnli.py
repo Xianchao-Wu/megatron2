@@ -21,7 +21,7 @@ from .data import GLUEAbstractDataset
 
 
 LABELS = {'contradiction': 0, 'entailment': 1, 'neutral': 2}
-
+# contradiction=矛盾，entailment=蕴含，neutral=中性
 
 class MNLIDataset(GLUEAbstractDataset):
 
@@ -52,6 +52,23 @@ class MNLIDataset(GLUEAbstractDataset):
                                 row[0].strip(), row[8].strip(),
                                 row[9].strip(), self.test_label))
                     else:
+                        # TODO strange, 对不上: C:\Users\user\Desktop\emnlp2021-finmegatron\multinli_1.0
+                        # 0, gold_label	
+                        # 1, sentence1_binary_parse	
+                        # 2, sentence2_binary_parse	
+                        # 3, sentence1_parse	
+                        # 4, sentence2_parse	
+                        # 5, sentence1	
+                        # 6, sentence2	
+                        # 7, promptID	
+                        # 8, pairID	
+                        # 9, genre	
+                        # 10, label1	
+                        # 11, label2	
+                        # 12, label3	
+                        # 13, label4	
+                        # 14, label5
+
                         print_rank_0('    reading {} , {}, {}, and {} columns '
                                      '...'.format(
                                          row[0].strip(), row[8].strip(),

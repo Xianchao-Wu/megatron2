@@ -29,11 +29,11 @@ _HALF_TYPES = (torch.HalfTensor, torch.cuda.HalfTensor)
 
 class MegatronModule(torch.nn.Module):
     """Megatron specific extensions of torch Module with support
-    for pipelining."""
+    for pipelining (pipeline并行化)."""
 
     def __init__(self, share_word_embeddings=True):
         super(MegatronModule, self).__init__()
-        self.share_word_embeddings = share_word_embeddings
+        self.share_word_embeddings = share_word_embeddings # True=共享; False=不共享
 
 
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',
@@ -46,11 +46,13 @@ class MegatronModule(torch.nn.Module):
             keep_vars : (False)
         """
         return self.state_dict(destination, prefix, keep_vars)
+        # 用于保存到文件的状态词典(包含训练好的参数)
 
 
     def word_embeddings_weight(self):
         if mpu.is_pipeline_first_stage():
             return self.language_model.embedding.word_embeddings.weight
+            # TODO 没有看到self.language_model啊！哪里定义了？
         if mpu.is_pipeline_last_stage():
             if not self.share_word_embeddings:
                 raise Exception('word_embeddings_weight() called for last '
@@ -90,6 +92,8 @@ class MegatronModule(torch.nn.Module):
                 self.word_embeddings.weight.shared = True
         # Ensure that first and last stages have the same initial parameter
         # values.
+        # TODO 背后的考量是什么？
+        # 已知的是：first_stage()和last_stage()构成了当前进程所在的 embedding group!
         if mpu.is_pipeline_first_stage() or mpu.is_pipeline_last_stage():
             torch.distributed.all_reduce(self.word_embeddings_weight().data,
                                          group=mpu.get_embedding_group())
@@ -135,11 +139,15 @@ def fp16_to_fp32(val):
 
 
 class FP16Module(MegatronModule):
+    # 有被用到：
+    # megatron/training.py:        model = FP16Module(model)
 
     def __init__(self, module):
         super(FP16Module, self).__init__()
         self.add_module('module', module.half())
-
+        # nn.Module中的half()方法将模型中的float32转化为float16，
+        # 实现的原理是遍历所有tensor，而float32和float16都是tensor的属性。
+        # 也就是说，一行代码解决.
 
     def forward(self, *inputs, **kwargs):
         if mpu.is_pipeline_first_stage():

@@ -33,13 +33,24 @@ def parallel_lm_logits(input_, word_embeddings_weight, parallel_output,
     # Matrix multiply.
     if bias is None:
         logits_parallel = F.linear(input_parallel, word_embeddings_weight)
+        # (input=x, weight=A, bias=None=b), y=x*A^T+b
+        # input.shape=(batch.size, seq.len, in.hidden.size)
+        # weight=word_embeddings_weight.shape=(out.hidden.size, in.hidden.size)
+        # bias=(out.hidden.size)
+        # output=(batch.size, seq.len, out.hidden.size)
+
+        # word_embeddings_weight这个参数有意思！|vocab.size|=行数；|in.hidden.size|=列数
+        # 相当于一个word，用一个in.hidden.size来表示。
+        # TODO 问题，这个word_embeddings_weight和token的word_embeddings一样吗？
     else:
         logits_parallel = F.linear(input_parallel, word_embeddings_weight, bias)
-    # Gather if needed.
-    if parallel_output:
-        return logits_parallel
 
+    # Gather if needed.
+    if parallel_output: # do not gather (keep parallel)
+        return logits_parallel
+    # gather here:
     return mpu.gather_from_tensor_model_parallel_region(logits_parallel)
+    # 输出的shape类似于：(batch.size, seq.len, vocab.size)
 
 
 def get_language_model(attention_mask_func, num_tokentypes, add_pooler,
@@ -262,7 +273,7 @@ class TransformerLanguageModelBase(MegatronModule):
 
     Arguments:
         transformer_hparams: transformer hyperparameters
-        attention_mask_func: a function that takes `unmaksed-attention-scores`
+        attention_mask_func: a function that takes `unmasked-attention-scores`
             with size [b, np, s, s] and an `attention-mask` and will apply
             the masking. The function should return a masked score of the
             same size [b, np, s, s].

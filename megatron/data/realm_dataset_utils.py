@@ -6,6 +6,7 @@ import torch
 
 from megatron import mpu, print_rank_0
 from megatron.data.dataset_utils import create_masked_lm_predictions, pad_and_convert_to_numpy
+# pad_and_convert_to_numpy is not used in this file!
 from megatron import get_args, get_tokenizer, print_rank_0, mpu
 
 

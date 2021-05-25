@@ -10,6 +10,8 @@
 # Added document index to index file and made it accessible.
 #    An empty sentence no longer separates documents.
 
+# 来自facebook的fairseq的代码
+
 from functools import lru_cache
 import os
 import shutil
@@ -205,7 +207,7 @@ class IndexedDataset(torch.utils.data.Dataset):
 
     @property
     def supports_prefetch(self):
-        return False  # avoid prefetching to save memory
+        return False  # avoid prefetching to save memory - 预先载入
 
 
 class IndexedCachedDataset(IndexedDataset):

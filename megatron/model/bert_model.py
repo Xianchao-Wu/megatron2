@@ -51,9 +51,12 @@ def bert_extended_attention_mask(attention_mask):
 def bert_position_ids(token_ids):
     # Create position ids
     seq_length = token_ids.size(1)
+    
+    # position_ids=[0, 1, ..., seq_length-1] -> shape=(1, seq_length)
     position_ids = torch.arange(seq_length, dtype=torch.long,
                                 device=token_ids.device)
     position_ids = position_ids.unsqueeze(0).expand_as(token_ids)
+    # shape=(batch.size, seq_length)
 
     return position_ids
 
@@ -92,9 +95,9 @@ class BertLMHead(MegatronModule):
             self.gelu = erf_gelu
 
     def forward(self, hidden_states, word_embeddings_weight):
-        hidden_states = self.dense(hidden_states)
-        hidden_states = self.gelu(hidden_states)
-        hidden_states = self.layernorm(hidden_states)
+        hidden_states = self.dense(hidden_states) # 一层线性层
+        hidden_states = self.gelu(hidden_states)　# gelu，非线性激活函数
+        hidden_states = self.layernorm(hidden_states) # 层normalization
         output = parallel_lm_logits(hidden_states,
                                     word_embeddings_weight,
                                     self.parallel_output,

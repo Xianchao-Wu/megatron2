@@ -1,4 +1,4 @@
-/*
+﻿/*
  coding=utf-8
  Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 
@@ -33,11 +33,12 @@ using namespace std;
 const int32_t LONG_SENTENCE_LEN = 512;
 
 
-void build_blending_indices(py::array_t<uint8_t>& dataset_index,
-			    py::array_t<int64_t>& dataset_sample_index,
-			    const py::array_t<double>& weights,
-			    const int32_t num_datasets,
-			    const int64_t size, const bool verbose) {
+void build_blending_indices(py::array_t<uint8_t>& dataset_index, //len=sample size, all 0
+			    py::array_t<int64_t>& dataset_sample_index, //len=sample size, all 0
+			    const py::array_t<double>& weights, //weight for each dataset, in datasets
+			    const int32_t num_datasets, //number of datasets
+			    const int64_t size, // sample size = number of samples
+                const bool verbose) { //torch.distributed.get_rank() == 0 is 0-th gpu or not
   /* Given multiple datasets and a weighting array, build samples
    such that it follows those wieghts.*/
 
@@ -60,26 +61,36 @@ void build_blending_indices(py::array_t<uint8_t>& dataset_index,
   for(int64_t sample_idx = 0; sample_idx < size; ++sample_idx) {
 
     // Determine where the max error in sampling is happening.
-    auto sample_idx_double = std::max(static_cast<double>(sample_idx), 1.0);
-    int64_t max_error_index = 0;
+    auto sample_idx_double = std::max(static_cast<double>(sample_idx), 1.0); 
+    //TODO why, when sample_idx=0, sample_idx_double=1.0???
+
+    int64_t max_error_index = 0; //initial value of the index of dataset
     double max_error = weights_ptr[0] * sample_idx_double -
-      static_cast<double>(current_samples[0]);
+      static_cast<double>(current_samples[0]); //TODO what is max error?
+      //max_error, when sample_idx is assigned to 0-th dataset
+
     for (int64_t dataset_idx = 1; dataset_idx < num_datasets; ++dataset_idx) {
       double error = weights_ptr[dataset_idx] * sample_idx_double -
-	static_cast<double>(current_samples[dataset_idx]);
+	    static_cast<double>(current_samples[dataset_idx]);
+      //error = weight of current dataset * sample idx - number of samples in current dataset
+      //TODO what does this mean?
       if (error > max_error) {
-	max_error = error;
-	max_error_index = dataset_idx;
+	    max_error = error;
+	    max_error_index = dataset_idx; //index of a dataset, when current sample is assigned
+        //to that dataset, the error is maximum
       }
     }
 
     // Populate the indices.
+    //sample_idx = current sample's index
+    //max_error_index = index of a dataset, that sample_with_sample_idx is assigned to
     dataset_index_ptr[sample_idx] = static_cast<uint8_t>(max_error_index);
     dataset_sample_index_ptr[sample_idx] = current_samples[max_error_index];
 
     // Update the total samples.
     current_samples[max_error_index] += 1;
-    
+    //idx= index of a dataset
+    //value= the number of samples that are assigned to current dataset so far
   }
 
   // print info
@@ -87,12 +98,12 @@ void build_blending_indices(py::array_t<uint8_t>& dataset_index,
     std::cout << " > sample ratios:" << std::endl;
     for (int64_t dataset_idx = 0; dataset_idx < num_datasets; ++dataset_idx) {
       auto ratio = static_cast<double>(current_samples[dataset_idx]) /
-	static_cast<double>(size);
+	    static_cast<double>(size);
       std::cout << "   dataset " << dataset_idx << ", input: " <<
-	weights_ptr[dataset_idx] << ", achieved: " << ratio << std::endl; 
+	    weights_ptr[dataset_idx] << ", achieved: " << ratio << std::endl; 
+      //ratio of the number of samples in a dataset_idx / the number of total samples
     }
   }
-
 }
 
 

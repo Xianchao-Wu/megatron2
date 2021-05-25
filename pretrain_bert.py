@@ -71,14 +71,21 @@ def get_batch(data_iterator):
     data_b = mpu.broadcast_data(keys, data, datatype)
 
     # Unpack.
-    tokens = data_b['text'].long()
-    types = data_b['types'].long()
-    sentence_order = data_b['is_random'].long()
-    loss_mask = data_b['loss_mask'].float()
-    lm_labels = data_b['labels'].long()
-    padding_mask = data_b['padding_mask'].long()
+    tokens = data_b['text'].long() # 1
+    types = data_b['types'].long() # 2
+    sentence_order = data_b['is_random'].long() # 6
+    loss_mask = data_b['loss_mask'].float() # 5
+    lm_labels = data_b['labels'].long() # 3
+    padding_mask = data_b['padding_mask'].long() # 4
 
     return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask
+    # 来自megatron/data/bert_dataset.py里面的build_training_sample方法
+    # 1. 'text', tokens_np: 打上了补丁之后的tokens（也被mask了，以及可能的permutation了）
+    # 2. 'types', tokentypes_np: 打上了补丁之后的tokentypes（0/[cls] 0/segment1 0/[sep] 1/segment2 1/[sep] 而后是0)
+    # 3. 'labels', labels_np: 缺省值为-1，如果一个i位置的piece被mask了，则其labels[i]=原始的token id
+    # 4. 'padding_mask', padding_mask_np: 如果是补丁，取0；否则取1
+    # 5. 'loss_mask', loss_mask_np: 缺省值为0，如果一个i位置的piece被mask了，则其loss_mask[i]=1
+    # 6. 'is_random', # is_next_random=1 if a,b两个segments进行了互换; 0 otherwise
 
 
 def forward_step(data_iterator, model, input_tensor):
@@ -111,7 +118,7 @@ def forward_step(data_iterator, model, input_tensor):
         lm_loss_, sop_logits = output_tensor
 
         sop_loss = F.cross_entropy(sop_logits.view(-1, 2).float(),
-                                   sentence_order.view(-1),
+                                   sentence_order.view(-1), # 1/0 as reference
                                    ignore_index=-1)
         sop_loss = sop_loss.float()
 
@@ -120,7 +127,7 @@ def forward_step(data_iterator, model, input_tensor):
         lm_loss = torch.sum(
             lm_loss_.view(-1) * loss_mask.reshape(-1)) / loss_mask.sum()
 
-        loss = lm_loss + sop_loss
+        loss = lm_loss + sop_loss # 如果基于loss来进行反向传播，那就是multi-task learning
 
         averaged_losses = average_losses_across_data_parallel_group([lm_loss, sop_loss])
 
@@ -151,5 +158,9 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
 
 if __name__ == "__main__":
 
+    # 1. train_valid_test_datasets_provider: 一个函数，准备train/valid/test数据
+    # 2. model_provider: 一个函数，建立model
+    # 3. forward_step: 一个函数
+    # 4. args_defaults: 这里只是指定bert tokenizer的类型
     pretrain(train_valid_test_datasets_provider, model_provider, forward_step,
              args_defaults={'tokenizer_type': 'BertWordPieceLowerCase'})

@@ -31,15 +31,16 @@ from megatron.mpu import set_tensor_model_parallel_rank, set_tensor_model_parall
 def initialize_megatron(extra_args_provider=None, args_defaults={},
                         ignore_unknown_args=False, allow_no_cuda=False):
     """Set global variables, initialize distributed, and
-    set autoresume and random seeds.
-    `allow_no_cuda` should not be set unless using megatron for cpu only 
+    set autoresume (自动恢复) and random seeds.
+    `allow_no_cuda` should not be set (to be True) unless using megatron for cpu only 
     data processing. In general this arg should not be set unless you know 
     what you are doing.
     Returns a function to finalize distributed env initialization 
     (optionally, only when args.lazy_mpu_init == True)
 
 """
-    if not allow_no_cuda:
+    if not allow_no_cuda: 
+        # allow_no_cuda=允许在无cuda下执行-> not allow_no_cuda=不允许在无cuda下执行 -> 必须要有cuda/gpu （默认）
         # Make sure cuda is available.
         assert torch.cuda.is_available(), 'Megatron requires CUDA.'
 
@@ -61,9 +62,9 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
         _set_random_seed(args.seed)
 
     args = get_args()
-    if  args.lazy_mpu_init:
+    if  args.lazy_mpu_init: # None
         args.use_cpu_initialization=True
-        # delayed initialization of DDP-related stuff
+        # delayed initialization of DDP-related stuff, TODO DDP是什么？-> Distributed Data Parallel
         # We only set basic DDP globals    
         set_tensor_model_parallel_world_size(args.tensor_model_parallel_size)
         # and return function for external DDP manager to call when it has DDP initialized
@@ -80,12 +81,13 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
         _init_autoresume()
 
         # Compile dataset C++ code.
+        # 特别指：megatron.data.helpers.cpp
         try:
             from megatron.data import helpers
         except:
             if torch.distributed.get_rank() == 0:
                 from megatron.data.dataset_utils import compile_helper
-                compile_helper()
+                compile_helper() # 在python中调用subprocess, -> make命令
             # Simple barrier
             torch.distributed.barrier()
         

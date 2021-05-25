@@ -81,7 +81,8 @@ def convert_to_unicode(text): # Ja can have, OKAY
         if isinstance(text, str):
             return text
         elif isinstance(text, bytes):
-            return text.decode("utf-8", "ignore") # errors='ignore', 设置不同的错误处理方案，'strict'的时候，如果编码错误，则会引起一个UnicodeError.
+            return text.decode("utf-8", "ignore") 
+            # errors='ignore', 设置不同的错误处理方案，'strict'的时候，如果编码错误，则会引起一个UnicodeError.
         else:
             raise ValueError("Unsupported string type: %s" % (type(text)))
     elif six.PY2:
@@ -325,7 +326,7 @@ class WordpieceTokenizer(object):
 
         Args:
           text: A single token or whitespace separated tokens. This should have
-            already been passed through `BasicTokenizer.
+            already been passed through BasicTokenizer.
 
         Returns:
           A list of wordpiece tokens.
