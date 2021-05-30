@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Processing data for pretraining."""
+"""Processing data for pretraining, enfsi=English Financial Service I (FSI)."""
 import os
-#os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 import argparse
 import json
@@ -65,7 +65,8 @@ class Encoder(object):
             if not nltk_available:
                 print("NLTK is not available to split sentences.")
                 exit()
-            if self.args.tokenizer_type == "BertWordPieceJp" or self.args.tokenizer_type.startswith('GPT2BPETokenizerJp'):
+            if self.args.tokenizer_type == "BertWordPieceJp" or \
+                self.args.tokenizer_type.startswith('GPT2BPETokenizerJp'):
                 # TODO for japanese langugae's sentence split: 日文段落的分句：
                 #from nltk.tokenize import RegexpTokenizer
                 jp_sent_splitter = nltk.RegexpTokenizer(u'[^！？。]*[！？。]')
@@ -90,13 +91,15 @@ class Encoder(object):
     #    else:
     #        return Encoder.splitter.tokenize(text)
 
-    def encode(self, json_line): # 该方法负责把一行输入的json格式的document(text)分别进行“句子切割”和“word to id"的变换：
+    def encode(self, json_line): 
+        # 该方法负责把一行输入的json格式的document(text)分别进行“句子切割”和“word to id"的变换：
         data = json.loads(json_line)
         ids = {}
         for key in self.args.json_keys:
             text = data[key]
             doc_ids = []
-            for sentence in Encoder.splitter.tokenize(text): # TODO 重要，这里进行句子级别的切割，日语需要特别处理！
+            for sentence in Encoder.splitter.tokenize(text): 
+                # TODO 重要，这里进行句子级别的切割，日语需要特别处理！
                 #for sentence in sent_split(text):
                 sentence_ids = Encoder.tokenizer.tokenize(sentence) 
                 # TODO 重要，这里进行从一个字符串句子到一个ids构成的句子之间的变换
@@ -116,11 +119,15 @@ def get_args():
     #apath = r'C:\Users\xianchaow\source\repos\megatron\pretrained\'
     #definput = apath + r'\bert_pretrain\small_data_line3.json'
     #vocabfn = apath + r'\bert-large-cased-vocab.txt'
-    definput = apath + r'\bert_pretrain\small_data_line_jp.json'
-    #vocabfn = r'C:\Users\user\source\repos\megatron\megatron\pretrained\tohoku-u\BERT-base_mecab-ipadic-bpe-32k\vocab.txt' 
+    definput = apath + r'\bert_en_fsi\eight.files3.json'
+    #vocabfn = r'C:\Users\user\source\repos\megatron\megatron\pretrained\tohoku-u\
+    #    BERT-base_mecab-ipadic-bpe-32k\vocab.txt' 
     # for bert ja
-    vocabfn = r'C:\Users\user\source\repos\gpt2-japanese\ja-bpe.txt' # for gpt-2 ja
-    emojifn = r'C:\Users\user\source\repos\gpt2-japanese\emoji.json'
+    #vocabfn = r'C:\Users\user\source\repos\gpt2-japanese\ja-bpe.txt' # for gpt-2 ja
+    #emojifn = r'C:\Users\user\source\repos\gpt2-japanese\emoji.json'
+    vocabfn = apath + r'\bert_en_fsi\bert-large-cased-vocab.txt'
+    def_prefix = 'fsi-en-bert-large-cased-small3-win10'
+    tok_type = 'BertWordPieceCase'
 
     group.add_argument('--input', type=str, required=False,
                        default=definput,
@@ -139,8 +146,10 @@ def get_args():
 
     group = parser.add_argument_group(title='tokenizer')
     group.add_argument('--tokenizer-type', type=str, required=False,
-                       #default='BertWordPieceJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
-                       default='GPT2BPETokenizerJp', # for japanese gpt2; 'GPT2BPETokenizer' is for english gpt2
+                       #default='BertWordPieceJp', 
+                       ## for japanese bert; #'BertWordPieceLowerCase' for english bert,
+                       default=tok_type, 
+                       # for japanese gpt2; 'GPT2BPETokenizer' is for english gpt2
                        choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceJp',
                                 'GPT2BPETokenizer', 'GPT2BPETokenizerJp', 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
@@ -151,7 +160,7 @@ def get_args():
                        help='Path to the BPE merge file (if necessary).')
     group.add_argument('--mecab-dict-path', type=str, default=None,
                        help='Path to the dict(ipadict/unidict) of MeCab for Japanese Word Breaker.')
-    group.add_argument('--emoji-file', type=str, default=emojifn, 
+    group.add_argument('--emoji-file', type=str, default=None, 
                        help="emoji file for Japanese GPT-2 BPE tokenizer (if necessary)")
     group.add_argument('--append-eod', action='store_true', # 如果没有--append-eod，则表示不增加<eod>
                        help='Append an <eod> token to the end of a document.')
@@ -159,7 +168,7 @@ def get_args():
 
     group = parser.add_argument_group(title='output data')
     group.add_argument('--output-prefix', type=str, required=False,
-                       default='my-gpt2-ja-debug', #'my-bert-ja-debug',
+                       default=def_prefix, #'my-bert-ja-debug',
                        help='Path to binary output file without suffix')
     group.add_argument('--dataset-impl', type=str, default='mmap',
                        choices=['lazy', 'cached', 'mmap']) # memory-map?
@@ -188,15 +197,19 @@ def main():
     startup_start = time.time()
 
     print("Opening", args.input) # input json file
-    fin = open(args.input, 'r', encoding='utf-8') # json file， 'C:\\Users\\user\\source\\repos\\megatron\\megatron\\pretrained\\bert_pretrain\\small_data_line_jp.json'
+    fin = open(args.input, 'r', encoding='utf-8') 
+    # json file， 'C:\\Users\\user\\source\\repos\\megatron\\megatron\\
+    #     pretrained\\bert_pretrain\\small_data_line_jp.json'
 
     if nltk_available and args.split_sentences:
         nltk.download("punkt", quiet=True) # punkt for sentence tokenizer
 
     encoder = Encoder(args)
     tokenizer = build_tokenizer(args) # TODO why need this? 可以直接用encoder.tokenizer
-    pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer) # TODO，构建一个Pool对象，进程池
-    encoded_docs = pool.imap(encoder.encode, fin, 25) # TODO what is "25"? = chunksize, 这里的fin是一个iterable的对象(文件句柄)
+    pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer) 
+    # TODO，构建一个Pool对象，进程池
+    encoded_docs = pool.imap(encoder.encode, fin, 25) 
+    # TODO what is "25"? = chunksize, 这里的fin是一个iterable的对象(文件句柄)
     # fin按块25（类似于25行一个线程）执行encoder.encode (即把文字列转换为id).
     #encoded_docs = map(encoder.encode, fin)
 
@@ -215,7 +228,8 @@ def main():
         output_idx_files[key] = "{}_{}_{}.idx".format(args.output_prefix,
                                                       key, level)
         builders[key] = indexed_dataset.make_builder(output_bin_files[key], 
-                                               # output_bin_files = {'text': 'my-gpt2-ja-debug_tex...ntence.bin'}
+                                               # output_bin_files = 
+                                               # {'text': 'my-gpt2-ja-debug_tex...ntence.bin'}
                                                impl=args.dataset_impl,
                                                vocab_size=tokenizer.vocab_size)
 
@@ -226,13 +240,15 @@ def main():
 
     for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
         total_bytes_processed += bytes_processed
-        for key, sentences in doc.items(): # sentences = [[15457, 1166, 1103, 16688, 3676]] -> jumps over the lazy dog
+        for key, sentences in doc.items(): # sentences = [[15457, 1166, 1103, 16688, 3676]] 
+            # -> jumps over the lazy dog
             # sentences = [[15457, 1166, 1103, 16688, 3676, 119], -> jumps over the lazy dog .
             # [178, 1108, 1177, 6782, 1106, 2100, 1115, 119], 
             # [1142, 1110, 170, 1363, 1285, 2052, 119], 
             # [9367, 171, 19954, 1358, 119], "fuck b ##aid ##u ." = 5 tokens
             # [9367, 17599, 7301, 4964, 119]], "fuck micro ##so ##ft ." = 5 tokens
-            # jumps over the lazy dog. i was so sad to hear that. this is a good day today. fuck baidu. fuck microsoft.
+            # jumps over the lazy dog. i was so sad to hear that. this is a good day today. 
+            # fuck baidu. fuck microsoft.
             # 119="."
             for sentence in sentences:
                 builders[key].add_item(torch.IntTensor(sentence))
@@ -259,3 +275,4 @@ def main():
 if __name__ == '__main__':
     main() # local test okay (without gpu), to test the Japanese tokenizer in the future -> okay now.
     # from .json file to .bin and .idx files (写二进制文件)
+    # win10下面的文件，用于在win10 os下测试用（梳理方法，学习编程思想）

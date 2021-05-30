@@ -25,9 +25,15 @@ from megatron import print_rank_0
 
 def __best_fitting_dtype(vocab_size=None):
     if vocab_size is not None and vocab_size < 65500:
-        return np.uint16
+        return np.uint16 # 2^16=65536
     else:
         return np.int32
+
+# Python 用下划线作为变量前缀和后缀指定特殊变量
+#_xxx 不能用’from module import *’导入
+#__xxx__ 系统定义名字
+#__xxx 类中的私有变量名
+#核心风格：避免用下划线作为变量名的开始。
 
 
 def get_available_dataset_impl():
@@ -38,9 +44,9 @@ def infer_dataset_impl(path):
     if IndexedDataset.exists(path):
         with open(index_file_path(path), 'rb') as f:
             magic = f.read(8)
-            if magic == IndexedDataset._HDR_MAGIC:
+            if magic == IndexedDataset._HDR_MAGIC: # b'TNTIDX\x00\x00', header_magic
                 return 'cached'
-            elif magic == MMapIndexedDataset.Index._HDR_MAGIC[:8]:
+            elif magic == MMapIndexedDataset.Index._HDR_MAGIC[:8]: # b'MMIDIDX\x00\x00'
                 return 'mmap'
             else:
                 return None
@@ -50,7 +56,8 @@ def infer_dataset_impl(path):
         return None
 
 
-def make_builder(out_file, impl, vocab_size=None):
+def make_builder(out_file, impl, vocab_size=None): 
+    # out_file = 'my-gpt2-ja-debug_text_sentence.bin'; impl = 'mmap'; vocab_size = 20573
     if impl == 'mmap':
         return MMapIndexedDatasetBuilder(out_file, dtype=__best_fitting_dtype(vocab_size))
     else:
@@ -58,12 +65,25 @@ def make_builder(out_file, impl, vocab_size=None):
 
 
 def make_dataset(path, impl, skip_warmup=False):
+    '''path=(例子) fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence.
+    Since, there are two files:
+    fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence.bin
+    fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence.idx
+
+    impl=mmap
+
+    output:
+    fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence_train_indexmap_32000000mns_512msl_0.10ssp_1234s.npy
+    fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence_valid_indexmap_64320mns_512msl_0.10ssp_1234s.npy
+    fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence_test_indexmap_320mns_512msl_0.10ssp_1234s.npy
+
+    '''
     if not IndexedDataset.exists(path):
         print(f"Dataset does not exist: {path}")
         print("Path should be a basename that both .idx and .bin can be appended to get full filenames.")
         return None
     if impl == 'infer':
-        impl = infer_dataset_impl(path)
+        impl = infer_dataset_impl(path) # 根据path.bin的前8个char来判断impl='cached' or 'mmap'
     if impl == 'lazy' and IndexedDataset.exists(path):
         return IndexedDataset(path)
     elif impl == 'cached' and IndexedDataset.exists(path):
@@ -103,7 +123,7 @@ dtypes = {
 }
 
 
-def code(dtype):
+def code(dtype): # dtype = <class 'numpy.uint16'> -> 映射到8, 参考的是dtypes这个词典
     for k in dtypes.keys():
         if dtypes[k] == dtype:
             return k
@@ -112,11 +132,15 @@ def code(dtype):
 
 def index_file_path(prefix_path):
     return prefix_path + '.idx'
-
+    # 例如，从
+    # fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence
+    # 到 fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence.idx
 
 def data_file_path(prefix_path):
     return prefix_path + '.bin'
-
+    # 例如，从
+    # fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence
+    # 到 fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence.bin
 
 def create_doc_idx(sizes):
     doc_idx = [0]
@@ -128,7 +152,7 @@ def create_doc_idx(sizes):
 
 class IndexedDataset(torch.utils.data.Dataset):
     """Loader for IndexedDataset"""
-    _HDR_MAGIC = b'TNTIDX\x00\x00'
+    _HDR_MAGIC = b'TNTIDX\x00\x00' # header_magic
 
     def __init__(self, path):
         super().__init__()
@@ -144,7 +168,7 @@ class IndexedDataset(torch.utils.data.Dataset):
                 'Make sure that --dataset-impl is configured properly.'
             )
             version = f.read(8)
-            assert struct.unpack('<Q', version) == (1,)
+            assert struct.unpack('<Q', version) == (1,) # unsigned long long (C) ~ long (python)
             code, self.element_size = struct.unpack('<QQ', f.read(16))
             self.dtype = dtypes[code]
             self._len, self.s = struct.unpack('<QQ', f.read(16))
@@ -336,23 +360,37 @@ def _warmup_mmap_file(path):
 
 class MMapIndexedDataset(torch.utils.data.Dataset):
     class Index(object):
-        _HDR_MAGIC = b'MMIDIDX\x00\x00'
+        _HDR_MAGIC = b'MMIDIDX\x00\x00' # header_magic
 
         @classmethod
         def writer(cls, path, dtype):
-            class _Writer(object):
+            '''cls=Index:class, path=index_file, dtype=self._dtype, alike numpy.uint16'''
+            '''classmethod修饰符对应的函数不需要实例化，不需要self参数，
+            但是第一个参数是表示自身类的cls参数，可以来调用类的属性，类的方法，实例化对象等。
+            即，可以直接使用： MMapIndexedDataset.Index.writer(index_file, self._dtype),
+            其创建的是_Writer:class的一个对象。
+            '''
+            class _Writer(object): # 有意思 TODO, 类定义在方法之内！
                 def __enter__(self):
-                    self._file = open(path, 'wb')
+                    ''' 在操作文件对象的时候，可以这么写：
+                    with open('a.txt') as f:
+                        code here
+                    上面的写法叫做“上下文管理协议”，即with语句，为了让一个对象兼容with语句，必须在这个对象的类种声明
+                    __enter__和__exit__方法！
+                    '''
+                    self._file = open(path, 'wb') # 'my-gpt2-ja-debug_text_sentence.idx'
 
-                    self._file.write(cls._HDR_MAGIC)
-                    self._file.write(struct.pack('<Q', 1))
-                    self._file.write(struct.pack('<B', code(dtype)))
-
+                    self._file.write(cls._HDR_MAGIC) # part 1; 9 bytes for b'MMIDIDX\x00\x00', cls here is for Index:class
+                    self._file.write(struct.pack('<Q', 1)) # part 2; 8 bytes for '1'(int64)
+                    self._file.write(struct.pack('<B', code(dtype))) # 1byte, unsigned char (C), integer (python)
+                    # dtype = <class 'numpy.uint16'> -> 8, B=unsignedchar
+                    # part 3
                     return self
+                    
 
                 @staticmethod
                 def _get_pointers(sizes):
-                    dtype_size = dtype().itemsize
+                    dtype_size = dtype().itemsize # 2
                     address = 0
                     pointers = []
 
@@ -360,47 +398,57 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                         pointers.append(address)
                         address += size * dtype_size
 
-                    return pointers
+                    return pointers 
+                    # pointers = [0, 60, 168, 200, 260, 314] or, 2doc case: pointers = [0, 60, 168, 200, 260, 314, 394, 454]
 
-                def write(self, sizes, doc_idx):
+                def write(self, sizes, doc_idx): # sizes = [30, 54, 16, 30, 27, 40], doc_idx = [0, 6]
                     pointers = self._get_pointers(sizes)
 
-                    self._file.write(struct.pack('<Q', len(sizes)))
-                    self._file.write(struct.pack('<Q', len(doc_idx)))
+                    self._file.write(struct.pack('<Q', len(sizes))) # 6, 写到index文件; part 4, 所有文档的句子的总和
+                    self._file.write(struct.pack('<Q', len(doc_idx))) # 2; part 5, 文档的数量=doc_idx-1
 
                     sizes = np.array(sizes, dtype=np.int32)
-                    self._file.write(sizes.tobytes(order='C'))
+                    self._file.write(sizes.tobytes(order='C')) # part 6, 每个句子中word piece (token)的数量
                     del sizes
 
-                    pointers = np.array(pointers, dtype=np.int64)
-                    self._file.write(pointers.tobytes(order='C'))
+                    pointers = np.array(pointers, dtype=np.int64) # pointers = [0, 60, 168, 200, 260, 314]
+                    self._file.write(pointers.tobytes(order='C')) # part 7, 句子的pointers
                     del pointers
 
-                    doc_idx = np.array(doc_idx, dtype=np.int64)
-                    self._file.write(doc_idx.tobytes(order='C'))
+                    doc_idx = np.array(doc_idx, dtype=np.int64) # doc_idx = [0, 6]
+                    self._file.write(doc_idx.tobytes(order='C')) # part 8, 每个document的起始位置?
 
-                def __exit__(self, exc_type, exc_val, exc_tb):
+                def __exit__(self, exc_type, exc_val, exc_tb): # None, None, None
+                    ''' 和__enter__对照 '''
                     self._file.close()
 
-            return _Writer()
+            return _Writer() # 返回的是内部类_Writer的一个对象
 
-        def __init__(self, path, skip_warmup=False):
+        def __init__(self, path, skip_warmup=False): # class Index的构造函数
+            # index_file_path(self._path) -> 传输进来的是path.idx文件：
             with open(path, 'rb') as stream:
-                magic_test = stream.read(9)
+                magic_test = stream.read(9) # read part 1, 9 byptes
                 assert self._HDR_MAGIC == magic_test, (
                     'Index file doesn\'t match expected format. '
                     'Make sure that --dataset-impl is configured properly.'
                 )
-                version = struct.unpack('<Q', stream.read(8))
+                version = struct.unpack('<Q', stream.read(8)) # 读取8个bytes，Q=unsigned long long(C语言)->long(python)
+                # read part 2, with 8 bytes
                 assert (1,) == version
 
-                dtype_code, = struct.unpack('<B', stream.read(1))
-                self._dtype = dtypes[dtype_code]
-                self._dtype_size = self._dtype().itemsize
+                dtype_code, = struct.unpack('<B', stream.read(1)) # B=unsigned char (C) -> integer (python)
+                # read part 3, with 1 bypte
 
-                self._len = struct.unpack('<Q', stream.read(8))[0]
+                self._dtype = dtypes[dtype_code] # 1到8，分别对应不同的数据类型
+                self._dtype_size = self._dtype().itemsize # not used
+
+                self._len = struct.unpack('<Q', stream.read(8))[0] # 单个元素的数组？
+                # read part 4, with 8 bytes, len(sizes)，所有文档中所有句子的个数
+
                 self._doc_count = struct.unpack('<Q', stream.read(8))[0]
-                offset = stream.tell()
+                # read part 5, with 8 bytes, len(doc_idx)，文档的个数+1
+
+                offset = stream.tell() # 返回文件的当前位置，即文件指针当前位置
 
             if not skip_warmup:
                 print_rank_0("    warming up index mmap file...")
@@ -409,17 +457,24 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
             self._bin_buffer_mmap = np.memmap(path, mode='r', order='C')
             self._bin_buffer = memoryview(self._bin_buffer_mmap)
             print_rank_0("    reading sizes...")
-            self._sizes = np.frombuffer(
+            self._sizes = np.frombuffer( # frombuffer = 将缓冲区解释为一维数组； read part 6
                 self._bin_buffer,
                 dtype=np.int32,
-                count=self._len,
+                count=self._len, # 所有文档中所有句子的个数
                 offset=offset)
             print_rank_0("    reading pointers...")
             self._pointers = np.frombuffer(self._bin_buffer, dtype=np.int64, count=self._len,
                                            offset=offset + self._sizes.nbytes)
+            # 所有句子的pointer; read part 7
+
+            # nbytes=只是存储数据所占的字节bytes个数
+            # a = np.array([[2, 11]], dtype=np.int64)
+            # print(a.nbytes) -> 16, 因为int64占8个bytes，这样的话，数据区就是2*8=16了。
+
             print_rank_0("    reading document index...")
             self._doc_idx = np.frombuffer(self._bin_buffer, dtype=np.int64, count=self._doc_count,
                                           offset=offset + self._sizes.nbytes + self._pointers.nbytes)
+            # read part 8, 文档的index，例如[0, 6, 8] _doc_count=真实的文档数量+1
 
         def __del__(self):
             self._bin_buffer_mmap._mmap.close()
@@ -444,7 +499,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
         def __len__(self):
             return self._len
 
-    def __init__(self, path, skip_warmup=False):
+    def __init__(self, path, skip_warmup=False): # MMapIndexedDataset的构造函数
         super().__init__()
 
         self._path = None
@@ -460,6 +515,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
         self._do_init(state)
 
     def _do_init(self, path, skip_warmup):
+        # path = path without .bin or .idx, i.e., path+'.bin' -> bin file, path+'.idx' -> idx file
         self._path = path
         self._index = self.Index(index_file_path(self._path), skip_warmup)
 
@@ -467,9 +523,18 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
             print_rank_0("    warming up data mmap file...")
             _warmup_mmap_file(data_file_path(self._path))
         print_rank_0("    creating numpy buffer of mmap...")
+
         self._bin_buffer_mmap = np.memmap(data_file_path(self._path), mode='r', order='C')
+        # 'r' = read-only; 'C' = column-major; cpu-memory
+        # 内存映像文件是一种将磁盘上的非常大的二进制数据文件当做内存中的数组进行处理的方式。
+        # NumPy实现了一个类似于ndarray的memmap对象，它允许将大文件分成小段进行读写，而不是一次性将整个数组读入内存。
+        # memmap也拥有跟普通数组一样的方法，因此，基本上只要是能用于ndarray的算法就也能用于memmap。
+
         print_rank_0("    creating memory view of numpy buffer...")
         self._bin_buffer = memoryview(self._bin_buffer_mmap)
+        # python内置函数
+        # 返回给定参数的“内存查看对象”(memory view)
+        # 是指对支持缓冲区协议的数据进行包装，在不需要复制对象的基础上允许python代码访问。
 
     def __del__(self):
         self._bin_buffer_mmap._mmap.close()
@@ -538,35 +603,58 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
         )
 
 
-class MMapIndexedDatasetBuilder(object):
-    def __init__(self, out_file, dtype=np.int64):
+class MMapIndexedDatasetBuilder(object): # MMap = memory map indexed data file (for .bin file = 数据文件相关的)
+    def __init__(self, out_file, dtype=np.int64): # out_file = 'my-gpt2-ja-debug_text_sentence.bin'; dtype = <class 'numpy.uint16'>
         self._data_file = open(out_file, 'wb') # write, binary file
         self._dtype = dtype
-        self._sizes = []
-        self._doc_idx = [0]
+        self._sizes = [] # 每个句子中word piece的个数
+        self._doc_idx = [0] # 主动增加一个0，之后是每个文档中的句子的个数。例子： self._sizes=[30, 54, 16, 30, 27, 40], self._doc_idx=[0, 6]
 
-    def add_item(self, tensor):
-        np_array = np.array(tensor.numpy(), dtype=self._dtype) # 不知不觉的时候，就已经转换为了id! (from text to id) TODO
-        self._data_file.write(np_array.tobytes(order='C'))
-        self._sizes.append(np_array.size)
+    def add_item(self, tensor): # tensor = tensor of one sentence
+        np_array = np.array(tensor.numpy(), dtype=self._dtype) 
+        # np_array = array([20298, 20262,  5049, 20263,   211, 16050,   529,    19,   537,       
+        # 16011,  5156,  7684, 15402, 20076,  6561, 20077, 16011,  6408,         
+        # 406, 17450, 20257,   214,  8413,  1007, 18073,  8184,   813,         
+        # 406,     3, 20258], dtype=uint16)
+        # 不知不觉的时候，就已经转换为了id! (from text to id) TODO/okay -> encoded_docs = pool.imap(encoder.encode, fin, 25) 是在这里实现的！
+
+        self._data_file.write(np_array.tobytes(order='C')) # C-order is by default
+        self._sizes.append(np_array.size) # 30
 
     def end_document(self):
-        self._doc_idx.append(len(self._sizes))
+        self._doc_idx.append(len(self._sizes)) # [30, 54, 16, 30, 27, 40,    30, 3] 
+        # 每个数字代表了一个句子中bpe(word piece)的个数，不同的文档会顺次被追加
 
     def merge_file_(self, another_file): # TODO a way to speed up the data preparing progress?
         # Concatenate index
         index = MMapIndexedDataset.Index(index_file_path(another_file))
-        assert index.dtype == self._dtype
+        # another_file传入的也是.bin和.idx的前缀
+        assert index.dtype == self._dtype # 两个文件的数据类型要求一致！
 
         for size in index.sizes:
             self._sizes.append(size)
 
         # Concatenate data
-        with open(data_file_path(another_file), 'rb') as f:
-            shutil.copyfileobj(f, self._data_file)
+        with open(data_file_path(another_file), 'rb') as f: # 打开另外一个文件的.bin，
+            shutil.copyfileobj(f, self._data_file) # 把f的内容复制给self._data_file (fsrc, fdst)
+        
+        # TODO this is problemtic - 是否有其他需要整合的信息？
+        # .bin文件可以直接追加，因为它是一个个的句子组成的。
+        # .idx比较麻烦：
+        # 前三个parts不变：
+        # idx part 1: 9 bytes, _HDR_MAGIC
+        # idx part 2: 8 bytes, 1
+        # idx part 3: 1 byte, value=8, for 'numpy.uint16', (vocab id)
 
-    def finalize(self, index_file):
+        # idx part 4: 8 bytes, len(sizes)=总体的句子的个数 (doc1's num1 + doc2's num2 + ... + docn's numn) -> 这个需要两个idx的part 4相加
+        # idx part 5: 8 bytes, len(doc_idx)=总体的文档的个数+1 -> 这个需要两个idx的part 5 相加之后-1 = total doc's num + 1
+        # idx part 6: 写sizes，即每个句子的长度(word piece的个数)，这个两个idx的这个部分直接叠加就好了
+        # idx part 7: 写pointers，这个的话，第二个idx文件的所有pointers都需要重新计算的！然后追加到第一个idx的最后边就可以了；
+        # idx part 8: 写_doc_idx，这个也是需要修改第二个idx文件的所有_doc_idx，然后追加到第一个idx的最后边就可以了。
+
+    def finalize(self, index_file): # e.g., index_file = 'my-gpt2-ja-debug_text_sentence.idx'
         self._data_file.close()
-
-        with MMapIndexedDataset.Index.writer(index_file, self._dtype) as index:
-            index.write(self._sizes, self._doc_idx)
+        # 构造一个writer对象：
+        with MMapIndexedDataset.Index.writer(index_file, self._dtype) as index: 
+            # index_file='my-gpt2-ja-debug_text_sentence.idx', self._dtype=<class 'numpy.uint16'>
+            index.write(self._sizes, self._doc_idx) # self._sizes=[30, 54, 16, 30, 27, 40], self._doc_idx=[0, 6]

@@ -21,6 +21,7 @@ class IndexBuilder(object):
         self.block_data = None
 
         # need to know whether we're using a REALM checkpoint (args.load) or ICT checkpoint
+        # TODO 这两种checkpoint的区别？
         assert not (args.load and args.ict_load)
         self.using_realm_chkpt = args.ict_load is None
 
@@ -80,12 +81,12 @@ class IndexBuilder(object):
 
         # This process signals to finalize its shard and then synchronize with the other processes
         self.block_data.save_shard()
-        torch.distributed.barrier()
+        torch.distributed.barrier() # 设置数据同步点
         del self.model
 
         # rank 0 process builds the final copy
         if self.is_main_builder:
-            self.block_data.merge_shards_and_save()
+            self.block_data.merge_shards_and_save() # shards=陶瓷碎片，模型的多个片段
             # make sure that every single piece of data was embedded
             assert len(self.block_data.embed_data) == len(self.dataset)
         self.block_data.clear()

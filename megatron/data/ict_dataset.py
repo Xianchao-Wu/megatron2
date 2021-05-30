@@ -37,6 +37,8 @@ def get_ict_dataset(use_titles=True, query_in_block_prob=1):
 
 class ICTDataset(Dataset):
     """Dataset containing sentences and their blocks for an inverse cloze task."""
+    # 反向完型填空任务则是，通过一句话，来预测一批句子是否是该句话的上下文。
+    # 可以理解为判断两个句子是否在一个document中，是一种预训练任务。
     def __init__(self, name, block_dataset, title_dataset, data_prefix,
                  num_epochs, max_num_samples, max_seq_length, query_in_block_prob,
                  seed, use_titles=True, use_one_sent_docs=False):
@@ -68,6 +70,9 @@ class ICTDataset(Dataset):
         """Get an ICT example of a pseudo-query and the block of text from which it was extracted"""
         sample_data = self.samples_mapping[idx]
         start_idx, end_idx, doc_idx, block_idx = sample_data.as_tuple()
+        # 三元组，其中(start_idx, end_idx)属于一个span的信息
+        # doc_idx属于document的索引
+        # block_idx属于block的索引
 
         if self.use_titles:
             title = self.title_dataset[int(doc_idx)]

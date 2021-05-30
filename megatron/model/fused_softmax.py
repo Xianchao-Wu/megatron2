@@ -24,7 +24,7 @@ class ScaledUpperTriangMaskedSoftmax(torch.autograd.Function) :
     """
     @staticmethod
     def forward(ctx, inputs, scale):
-        import scaled_upper_triang_masked_softmax_cuda
+        import scaled_upper_triang_masked_softmax_cuda # megatron.fused_kernels.__init__.py中有定义了TODO
         scale_t = torch.tensor([scale])
 
         softmax_results =  \
@@ -52,7 +52,7 @@ class ScaledMaskedSoftmax(torch.autograd.Function) :
     """
     @staticmethod
     def forward(ctx, inputs, mask, scale):
-        import scaled_masked_softmax_cuda
+        import scaled_masked_softmax_cuda # megatron.fused_kernels.__init__.py中有定义了TODO
         scale_t = torch.tensor([scale])
 
         softmax_results =  \

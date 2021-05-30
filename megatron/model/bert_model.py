@@ -96,7 +96,7 @@ class BertLMHead(MegatronModule):
 
     def forward(self, hidden_states, word_embeddings_weight):
         hidden_states = self.dense(hidden_states) # 一层线性层
-        hidden_states = self.gelu(hidden_states)　# gelu，非线性激活函数
+        hidden_states = self.gelu(hidden_states) # gelu，非线性激活函数
         hidden_states = self.layernorm(hidden_states) # 层normalization
         output = parallel_lm_logits(hidden_states,
                                     word_embeddings_weight,

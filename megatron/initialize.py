@@ -38,7 +38,7 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
     Returns a function to finalize distributed env initialization 
     (optionally, only when args.lazy_mpu_init == True)
 
-"""
+    """
     if not allow_no_cuda: 
         # allow_no_cuda=允许在无cuda下执行-> not allow_no_cuda=不允许在无cuda下执行 -> 必须要有cuda/gpu （默认）
         # Make sure cuda is available.
@@ -89,7 +89,7 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
                 from megatron.data.dataset_utils import compile_helper
                 compile_helper() # 在python中调用subprocess, -> make命令
             # Simple barrier
-            torch.distributed.barrier()
+            torch.distributed.barrier() # 对其他“非主进程”进行阻塞，达到同步的目的
         
         # No continuation function
         return None
@@ -99,7 +99,7 @@ def _initialize_distributed():
     """Initialize torch.distributed and mpu."""
     args = get_args()
 
-    device_count = torch.cuda.device_count()
+    device_count = torch.cuda.device_count() # 2
     if torch.distributed.is_initialized():
 
         if args.rank == 0:
@@ -123,13 +123,13 @@ def _initialize_distributed():
             torch.cuda.set_device(device)
         # Call the init process
         init_method = 'tcp://'
-        master_ip = os.getenv('MASTER_ADDR', 'localhost')
-        master_port = os.getenv('MASTER_PORT', '6000')
-        init_method += master_ip + ':' + master_port
+        master_ip = os.getenv('MASTER_ADDR', 'localhost') # localhost
+        master_port = os.getenv('MASTER_PORT', '6000') # '6000'
+        init_method += master_ip + ':' + master_port # init_method = 'tcp://localhost:6000'
         torch.distributed.init_process_group(
             backend=args.distributed_backend,
             world_size=args.world_size, rank=args.rank,
-            init_method=init_method)
+            init_method=init_method) # TODO when only use one gpu, a bug here:  No rendezvous handler for tcp://
 
     # Set the tensor model-parallel, pipeline model-parallel, and
     # data-parallel communicators.

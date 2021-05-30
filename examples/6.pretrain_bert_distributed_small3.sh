@@ -36,6 +36,7 @@ python -m torch.distributed.launch $DISTRIBUTED_ARGS \
        --load $CHECKPOINT_PATH_IN \
        --data-path $DATA_PATH \
        --vocab-file $vocabfn \
+       --tokenizer-type BertWordPieceCase \
        --data-impl mmap \
        --split 949,50,1 \
        --distributed-backend nccl \

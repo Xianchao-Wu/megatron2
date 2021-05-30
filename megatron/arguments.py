@@ -116,7 +116,7 @@ def parse_args(extra_args_provider=None, defaults={},
               flush=True)
 
     # Consumed tokens.
-    args.consumed_train_samples = 0 # 不是从命令行得到的值！
+    args.consumed_train_samples = 0 # 不是从命令行得到的值！ 新给args加了一个属性和值
     args.consumed_valid_samples = 0 # 取值无法从命令行获得！
 
     # Set input defaults.
@@ -172,7 +172,7 @@ def parse_args(extra_args_provider=None, defaults={},
         _check_arg_is_not_none(args, req_arg)
 
     # Checks.
-    assert args.hidden_size % args.num_attention_heads == 0 # 1024/16=64
+    assert args.hidden_size % args.num_attention_heads == 0 # 1024/16=64; or, 768/12=64
     if args.seq_length is not None:
         assert args.max_position_embeddings >= args.seq_length
     if args.lr is not None:
@@ -197,7 +197,7 @@ def parse_args(extra_args_provider=None, defaults={},
         if args.scaled_upper_triang_masked_softmax_fusion:
             fused_kernels.load_scaled_upper_triang_masked_softmax_fusion_kernel()
         else:
-            fused_kernels.load_scaled_masked_softmax_fusion_kernel()
+            fused_kernels.load_scaled_masked_softmax_fusion_kernel() # something wrong here: C:\Users\user\anaconda3\envs\pytorch36\lib\site-packages\torch\utils\cpp_extension.py:287: UserWarning: Error checking compiler version for cl: [WinError 2] The system cannot find the file specified;   warnings.warn('Error checking compiler version for {}: {}'.format(compiler, error)) INFO: Could not find files for the given pattern(s).
     else:
         # This argument will eventually go away, for now make sure it is off
         # if scaled_masked_softmax_fusion is off.
@@ -233,13 +233,13 @@ def _check_arg_is_not_none(args, arg):
 def _add_network_size_args(parser):
     group = parser.add_argument_group(title='network size')
 
-    group.add_argument('--num-layers', type=int, default=None,
+    group.add_argument('--num-layers', type=int, default=12, #None,
                        help='Number of transformer layers.')
-    group.add_argument('--hidden-size', type=int, default=None,
+    group.add_argument('--hidden-size', type=int, default=768, #None,
                        help='Tansformer hidden size.')
-    group.add_argument('--num-attention-heads', type=int, default=None,
+    group.add_argument('--num-attention-heads', type=int, default=12, #None,
                        help='Number of transformer attention heads.')
-    group.add_argument('--max-position-embeddings', type=int, default=None,
+    group.add_argument('--max-position-embeddings', type=int, default=128, #None,
                        help='Maximum number of position embeddings to use. '
                        'This is the size of position embedding.')
     group.add_argument('--make-vocab-size-divisible-by', type=int, default=128,
@@ -289,7 +289,7 @@ def _add_regularization_args(parser):
 def _add_training_args(parser):
     group = parser.add_argument_group(title='training')
 
-    group.add_argument('--micro-batch-size', type=int, default=None,
+    group.add_argument('--micro-batch-size', type=int, default=2, #None,
                        help='Batch size per model instance (local batch size). ' # 每个模型（整体）的batch size
                        'Global batch size is local batch size times data '
                        'parallel size times number of micro batches.')
@@ -297,7 +297,7 @@ def _add_training_args(parser):
     group.add_argument('--batch-size', type=int, default=None,
                        help='Old batch size parameter, do not use. '
                        'Use --micro-batch-size instead')
-    group.add_argument('--global-batch-size', type=int, default=None,
+    group.add_argument('--global-batch-size', type=int, default=4, #None,
                        help='Training batch size. If set, it should be a '
                        'multiple of micro-batch-size times data-parallel-size. '
                        'If this value is None, then '
@@ -325,7 +325,7 @@ def _add_training_args(parser):
                        'across model parallel group.')
     group.add_argument('--checkpoint-num-layers', type=int, default=1,
                        help='chunk size (number of layers) for checkpointing.')
-    group.add_argument('--train-iters', type=int, default=None,
+    group.add_argument('--train-iters', type=int, default=10, #None,
                        help='Total number of iterations to train over all '
                        'training runs. Note that either train-iters or '
                        'train-samples should be provided.')
@@ -333,7 +333,7 @@ def _add_training_args(parser):
                        help='Total number of samples to train over all '
                        'training runs. Note that either train-iters or '
                        'train-samples should be provided.')
-    group.add_argument('--log-interval', type=int, default=100,
+    group.add_argument('--log-interval', type=int, default=5, #100,
                        help='Report loss and timing interval.')
     group.add_argument('--exit-interval', type=int, default=None,
                        help='Exit the program after the iteration is divisible '
@@ -343,7 +343,7 @@ def _add_training_args(parser):
     group.add_argument('--tensorboard-dir', type=str, default=None,
                        help='Write TensorBoard logs to this directory.')
     group.add_argument('--no-scaled-masked-softmax-fusion',
-                       action='store_false',
+                       action='store_true', # win10 only. TODO original is store_false for linux
                        help='Disable fusion of query_key_value scaling, '
                        'masking, and softmax.',
                        dest='scaled_masked_softmax_fusion')
@@ -378,20 +378,20 @@ def _add_initialization_args(parser):
 def _add_learning_rate_args(parser):
     group = parser.add_argument_group(title='learning rate')
 
-    group.add_argument('--lr', type=float, default=None,
+    group.add_argument('--lr', type=float, default=0.0001, #None,
                        help='Initial learning rate. Depending on decay style '
                        'and initial warmup, the learing rate at each '
                        'iteration would be different.')
     group.add_argument('--lr-decay-style', type=str, default='linear',
                        choices=['constant', 'linear', 'cosine'],
                        help='Learning rate decay function.')
-    group.add_argument('--lr-decay-iters', type=int, default=None,
+    group.add_argument('--lr-decay-iters', type=int, default=2, #None,
                        help='number of iterations to decay learning rate over,'
                        ' If None defaults to `--train-iters`')
     group.add_argument('--lr-decay-samples', type=int, default=None,
                        help='number of samples to decay learning rate over,'
                        ' If None defaults to `--train-samples`')
-    group.add_argument('--lr-warmup-fraction', type=float, default=None,
+    group.add_argument('--lr-warmup-fraction', type=float, default=0.01, #None,
                        help='fraction of lr-warmup-(iters/samples) to use '
                        'for warmup (as a float)')
     group.add_argument('--lr-warmup-iters', type=int, default=0,
@@ -403,7 +403,7 @@ def _add_learning_rate_args(parser):
     group.add_argument('--warmup', type=int, default=None,
                        help='Old lr warmup argument, do not use. Use one of the '
                        '--lr-warmup-* arguments above')
-    group.add_argument('--min-lr', type=float, default=0.0,
+    group.add_argument('--min-lr', type=float, default=1.0e-5, #0.0,
                        help='Minumum value for learning rate. The scheduler'
                        'clip values below this threshold.')
     group.add_argument('--override-lr-scheduler', action='store_true',
@@ -424,15 +424,17 @@ def _add_learning_rate_args(parser):
 def _add_checkpointing_args(parser):
     group = parser.add_argument_group(title='checkpointing')
 
-    group.add_argument('--save', type=str, default=None,
+    def_checkpoint_path = r'C:\Users\user\source\repos\megatron\megatron\pretrained\bert_en_fsi'
+
+    group.add_argument('--save', type=str, default=def_checkpoint_path, #None,
                        help='Output directory to save checkpoints to.')
-    group.add_argument('--save-interval', type=int, default=None,
+    group.add_argument('--save-interval', type=int, default=5, #None,
                        help='Number of iterations between checkpoint saves.')
     group.add_argument('--no-save-optim', action='store_true',
                        help='Do not save current optimizer.')
     group.add_argument('--no-save-rng', action='store_true',
                        help='Do not save current rng state.')
-    group.add_argument('--load', type=str, default=None,
+    group.add_argument('--load', type=str, default=def_checkpoint_path, #None,
                        help='Directory containing a model checkpoint.')
     group.add_argument('--no-load-optim', action='store_true',
                        help='Do not load optimizer when loading checkpoint.')
@@ -513,10 +515,10 @@ def _add_distributed_args(parser):
 def _add_validation_args(parser):
     group = parser.add_argument_group(title='validation')
 
-    group.add_argument('--eval-iters', type=int, default=100,
+    group.add_argument('--eval-iters', type=int, default=5, #100,
                        help='Number of iterations to run for evaluation'
                        'validation/test for.')
-    group.add_argument('--eval-interval', type=int, default=1000,
+    group.add_argument('--eval-interval', type=int, default=5, #1000,
                        help='Interval between running evaluation on '
                        'validation set.')
 
@@ -525,18 +527,20 @@ def _add_validation_args(parser):
 
 def _add_data_args(parser):
     group = parser.add_argument_group(title='data and dataloader')
+    def_data_path=r'C:\Users\user\source\repos\megatron\megatron\fsi-en-bert-large-cased-small3-win10_text_sentence'
+    def_vocab_file=r'C:\Users\user\source\repos\megatron\megatron\pretrained\bert_en_fsi\bert-large-cased-vocab.txt'
 
-    group.add_argument('--data-path', nargs='*', default=None,
+    group.add_argument('--data-path', nargs='*', default=def_data_path, #None,
                        help='Path to the training dataset. Accepted format:'
                        '1) a single data path, 2) multiple datasets in the'
                        'form: dataset1-weight dataset1-path dataset2-weight '
                        'dataset2-path ...')
-    group.add_argument('--split', type=str, default='969, 30, 1',
+    group.add_argument('--split', type=str, default='949,50,1', #'969, 30, 1',
                        help='Comma-separated list of proportions for training,'
                        ' validation, and test split. For example the split '
                        '`90,5,5` will use 90%% of data for training, 5%% for '
                        'validation and 5%% for test.')
-    group.add_argument('--vocab-file', type=str, default=None,
+    group.add_argument('--vocab-file', type=str, default=def_vocab_file, #None,
                        help='Path to the vocab file.')
     group.add_argument('--merge-file', type=str, default=None,
                        help='Path to the BPE merge file.')
@@ -544,7 +548,7 @@ def _add_data_args(parser):
                        help='Path to the emoji file for japanese tokenization.')
     group.add_argument('--mecab-dict-path', type=str, default=None,
                        help='Path to the mecab dict (ipadict/unidict) file for japanese tokenization (word breaker).')
-    group.add_argument('--seq-length', type=int, default=None,
+    group.add_argument('--seq-length', type=int, default=128,#None,
                        help="Maximum sequence length to process.")
     group.add_argument('--mask-prob', type=float, default=0.15,
                        help='Probability of replacing a token with mask.')
@@ -555,7 +559,7 @@ def _add_data_args(parser):
     group.add_argument('--num-workers', type=int, default=2,
                        help="Dataloader number of workers.")
     group.add_argument('--tokenizer-type', type=str,
-                       default='GPT2BPETokenizer',
+                       default='BertWordPieceCase', #'GPT2BPETokenizer',
                        choices=['BertWordPieceLowerCase',
                                 'BertWordPieceCase',
                                 'BertWordPieceCaseJp',
@@ -563,7 +567,7 @@ def _add_data_args(parser):
                                 'GPT2BPETokenizerJp',
                                 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
-    group.add_argument('--data-impl', type=str, default='infer',
+    group.add_argument('--data-impl', type=str, default='mmap', #'infer',
                        choices=['lazy', 'cached', 'mmap', 'infer'],
                        help='Implementation of indexed datasets.')
     group.add_argument('--reset-position-ids', action='store_true',
@@ -589,7 +593,7 @@ def _add_autoresume_args(parser):
     return parser
 
 
-def _add_realm_args(parser):
+def _add_realm_args(parser): # REALM (2020.Feb.01): Retrieval-Augmented Language Model Pre-Training, a paper: https://arxiv.org/pdf/2002.08909.pdf
     group = parser.add_argument_group(title='realm')
 
     # network size
@@ -614,7 +618,7 @@ def _add_realm_args(parser):
     group.add_argument('--report-topk-accuracies', nargs='+', default=[],
                        help="Which top-k accuracies to report (e.g. '1 5 20')")
 
-    # faiss index
+    # faiss index, Faiss is a library for efficient similarity search and clustering of dense vectors. https://github.com/facebookresearch/faiss
     group.add_argument('--faiss-use-gpu', action='store_true',
                        help='Whether create the FaissMIPSIndex on GPU')
     group.add_argument('--block-data-path', type=str, default=None,

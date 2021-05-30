@@ -15,7 +15,7 @@
 
 """Processing data for pretraining."""
 import os
-#os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 import argparse
 import json
@@ -259,3 +259,4 @@ def main():
 if __name__ == '__main__':
     main() # local test okay (without gpu), to test the Japanese tokenizer in the future -> okay now.
     # from .json file to .bin and .idx files (写二进制文件)
+    # win10下面的文件，用于在win10 os下测试用（梳理方法，学习编程思想）

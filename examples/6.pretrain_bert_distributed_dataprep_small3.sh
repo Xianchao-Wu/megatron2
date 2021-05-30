@@ -7,6 +7,8 @@
 #prefix="my-bert"
 
 #jsonfile="/workspace/megatron/datasets/english-fsi/temp.testin.json"
+# 在tools.preprocess_data_win10_enfsi.py中，使用具体的本地化文件，default 参数赋值来实现：
+
 jsonfile="/workspace/megatron/datasets/english-fsi/eight.files3.json"
 vocabfile="/workspace/megatron/ngc_models/bert-large-cased-vocab.txt"
 prefix="fsi-en-bert-8files-bert-large-cased-vocab-bwplc-small3"

@@ -21,7 +21,7 @@ from abc import abstractmethod
 import torch
 
 from apex.multi_tensor_apply import multi_tensor_applier # apex/multi_tensor_apply/__init__.py里面
-import amp_C
+#import amp_C
 
 from megatron import get_timers
 from megatron import mpu
@@ -58,6 +58,7 @@ def _multi_tensor_copy_this_to_that(this, that, overflow_buf=None):
     else:
         overflow_buf = torch.cuda.IntTensor([0])
     # Scaling with factor `1.0` is equivalent to copy.
+    import amp_C
     multi_tensor_applier(amp_C.multi_tensor_scale, # op
                          overflow_buf, # noop_flag_buffer
                          [this, that], # tensor_lists

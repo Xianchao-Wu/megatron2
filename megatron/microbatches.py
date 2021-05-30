@@ -71,7 +71,7 @@ class NumMicroBatchesCalculator(ABC):
 
 class ConstantNumMicroBatches(NumMicroBatchesCalculator):
 
-    def __init__(self, global_batch_size, micro_batch_size, data_parallel_size):
+    def __init__(self, global_batch_size, micro_batch_size, data_parallel_size): # 4, 2, 1
         micro_batch_times_data_parallel = micro_batch_size * \
                                           data_parallel_size
         assert global_batch_size % micro_batch_times_data_parallel == 0, \
@@ -80,7 +80,7 @@ class ConstantNumMicroBatches(NumMicroBatchesCalculator):
                                                     micro_batch_size,
                                                     data_parallel_size)
         self.num_micro_batches = global_batch_size // \
-                                 micro_batch_times_data_parallel
+                                 micro_batch_times_data_parallel # 4/2=2
         assert self.num_micro_batches >= 1
         self.current_global_batch_size = global_batch_size
 

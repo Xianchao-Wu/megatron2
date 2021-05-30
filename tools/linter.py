@@ -30,7 +30,12 @@ def recursively_lint_files():
         print(py_path)
         command = 'autopep8 --max-line-length 100 --aggressive --in-place {}'.format(py_path)
         subprocess.check_call(command)
+        # 代码格式检查，
+        # 例如，import的时候，应该每一行只导入一个包
+        # 包导入和函数定义之间应该空两行
+        # python代码末尾不需要分号等等
 
+        # 使用了autopep8之后，可以确保代码符合PEP 8规范！有意思！
 
 if __name__ == "__main__":
     recursively_lint_files()

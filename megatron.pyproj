@@ -4,13 +4,14 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>6e9ff4b7-c9f5-46bc-89fe-ca6bf56de590</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>tools\preprocess_data.py</StartupFile>
+    <StartupFile>pretrain_bert_enfsi.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>megatron</Name>
     <RootNamespace>megatron</RootNamespace>
+    <InterpreterId>CondaEnv|CondaEnv|pytorch36</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -88,6 +89,7 @@
     <Compile Include="megatron\training.py" />
     <Compile Include="megatron\utils.py" />
     <Compile Include="megatron\__init__.py" />
+    <Compile Include="pretrain_bert_enfsi.py" />
     <Compile Include="pretrain_bert.py" />
     <Compile Include="pretrain_gpt.py" />
     <Compile Include="pretrain_ict.py" />
@@ -116,6 +118,8 @@
     <Compile Include="tools\openwebtext\group_duplicate_url.py" />
     <Compile Include="tools\openwebtext\merge_jsons.py" />
     <Compile Include="tools\openwebtext\remove_group_duplicates.py" />
+    <Compile Include="tools\preprocess_data_win10_enfsi.py" />
+    <Compile Include="tools\preprocess_data_win10_jp_gpt2.py" />
     <Compile Include="tools\preprocess_data.py" />
   </ItemGroup>
   <ItemGroup>
@@ -199,6 +203,9 @@
     <Content Include="README.md" />
     <Content Include="requirements.txt" />
     <Content Include="tools\openwebtext\README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="CondaEnv|CondaEnv|pytorch36" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

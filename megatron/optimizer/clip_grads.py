@@ -19,7 +19,7 @@ import torch
 from torch._six import inf
 
 from apex.multi_tensor_apply import multi_tensor_applier
-import amp_C
+#import amp_C
 
 from megatron import mpu
 
@@ -86,6 +86,7 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
             # Use apex's multi-tensor applier for efficiency reasons.
             # Multi-tensor applier takes a function and a list of list
             # and performs the operation on that list all in one kernel.
+            import amp_C
             grad_norm, _ = multi_tensor_applier(
                 amp_C.multi_tensor_l2norm, # L2 normalization?! TODO
                 dummy_overflow_buf,
@@ -112,6 +113,7 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
     # Scale. [变换比例！]
     clip_coeff = max_norm / (total_norm + 1.0e-6)
     if clip_coeff < 1.0:
+        import amp_C
         dummy_overflow_buf = torch.cuda.IntTensor([0])
         multi_tensor_applier(amp_C.multi_tensor_scale,
                              dummy_overflow_buf,

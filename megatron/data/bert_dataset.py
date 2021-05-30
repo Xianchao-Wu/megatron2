@@ -105,6 +105,8 @@ def get_samples_mapping_(indexed_dataset,
         max_num_samples = np.iinfo(np.int64).max - 1
 
     # Filename of the index mapping
+    # for example:
+    # fsi-ja-bert-large-vocab-50k-cc100_text_sentence_train_indexmap_480000000mns_512msl_0.10ssp_1234s.npy
     indexmap_filename = data_prefix
     indexmap_filename += '_{}_indexmap'.format(name)
     if num_epochs != (np.iinfo(np.int32).max - 1):
@@ -133,7 +135,7 @@ def get_samples_mapping_(indexed_dataset,
             name))
         # First compile and then import.
         from megatron.data import helpers
-        samples_mapping = helpers.build_mapping(
+        samples_mapping = helpers.build_mapping( # 调用cpp里面的方法
             indexed_dataset.doc_idx,
             indexed_dataset.sizes,
             num_epochs,
