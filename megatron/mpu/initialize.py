@@ -121,7 +121,7 @@ def initialize_model_parallel(tensor_model_parallel_size_=1,
     ensure_divisibility(world_size,
                         tensor_model_parallel_size * pipeline_model_parallel_size) # 16/(2*4)=2
     data_parallel_size = world_size // (tensor_model_parallel_size *
-                                        pipeline_model_parallel_size) # z=16/(x*y)=2，一份数据(mini-batch)二等分?
+                                        pipeline_model_parallel_size) # z=16/(x*y)=2，一份数据(mini-batch)二等分? TODO 例如，我们有512张卡，8个gpu保存一个完整的model，那么我们就是有tensor_model_parallel_size*pipeline_model_parallel_size=8，从而一共有512/8=64个模型的复制，每个独立的模型（保存在8gpu上）的指定部分，例如gpu 1, 9, 17, ..., 505，是共享相同的参数的，所以我们可以对这64个gpu，构造一个data parallel group，则这个数据并行组的大小就是64，我们可以为gpu 1, 9, ..., 505安排64个mini-batch，并对他们进行all-reduce。同理，对于gpu 2, 10, ..., 506；以及gpu 3, 11, ..., 507； gpu 4, 12, ..., 508；gpu 5, 13, ..., 509；gpu 6, 14, ..., 510；gpu 7, 15, ..., 511；gpu 8, 16, ..., 512都可以采用类似的方法来进行操作。
 
     num_tensor_model_parallel_groups = world_size // tensor_model_parallel_size # 张量-模型并行-组 的数量, 8
     num_pipeline_model_parallel_groups = world_size // pipeline_model_parallel_size # 管道-模型并行-组 的数量, 4
@@ -131,7 +131,7 @@ def initialize_model_parallel(tensor_model_parallel_size_=1,
 
 
     ### Build the data-parallel groups.
-    global _DATA_PARALLEL_GROUP # TODO->okay: global的范围是？本py文件内
+    global _DATA_PARALLEL_GROUP # global 1; TODO->okay: global的范围是？本py文件内
     assert _DATA_PARALLEL_GROUP is None, \
         'data parallel group is already initialized'
     all_data_parallel_group_ranks = []
@@ -143,13 +143,13 @@ def initialize_model_parallel(tensor_model_parallel_size_=1,
             # TODO有意思：这里是对 张量-模型并行-size=2 进行循环：
             ranks = range(start_rank + j, end_rank,
                           tensor_model_parallel_size) # 2
-            all_data_parallel_group_ranks.append(list(ranks))
+            all_data_parallel_group_ranks.append(list(ranks)) # [[0]]
             group = torch.distributed.new_group(ranks)
             if rank in ranks:
                 _DATA_PARALLEL_GROUP = group
 
     # i=4, i=0的时候: start_rank=0, end_rank=4; j=0 and 1 -> range(0, 4, 2)=[0, 2], and range(1, 4, 2)=[1, 3]
-    #range(0, 4, 2) -> [0, 2]
+    #range(0, 4, 2) -> [0, 2] -> gpu0 and gpu2 share the same parameter set
     #range(1, 4, 2) -> [1, 3]
 
     #range(4, 8, 2) -> [4, 6]
@@ -166,7 +166,7 @@ def initialize_model_parallel(tensor_model_parallel_size_=1,
 
 
     ### Build the model-parallel groups.
-    global _MODEL_PARALLEL_GROUP
+    global _MODEL_PARALLEL_GROUP # global 2,
     assert _MODEL_PARALLEL_GROUP is None, \
         'model parallel group is already initialized'
     for i in range(data_parallel_size): # 2. TODO why? not "pipeline_model_parallel_size"?
@@ -184,7 +184,7 @@ def initialize_model_parallel(tensor_model_parallel_size_=1,
 
     ### Build the tensor model-parallel groups. ### okay ###
     # 这部分代码最简单直接，没有涉及到其他的pipeline_parallel或者data_parallel的部分！
-    global _TENSOR_MODEL_PARALLEL_GROUP
+    global _TENSOR_MODEL_PARALLEL_GROUP # global 3,
     assert _TENSOR_MODEL_PARALLEL_GROUP is None, \
         'tensor model parallel group is already initialized'
     for i in range(num_tensor_model_parallel_groups): # 8
@@ -205,11 +205,11 @@ def initialize_model_parallel(tensor_model_parallel_size_=1,
 
     ### Build the pipeline model-parallel groups and ### okay ###
     ### embedding groups (which are first and last rank in each pipeline model-parallel group, TODO why?).
-    global _PIPELINE_MODEL_PARALLEL_GROUP
-    global _PIPELINE_GLOBAL_RANKS
+    global _PIPELINE_MODEL_PARALLEL_GROUP # global 4,
+    global _PIPELINE_GLOBAL_RANKS # global 5,
     assert _PIPELINE_MODEL_PARALLEL_GROUP is None, \
         'pipeline model parallel group is already initialized'
-    global _EMBEDDING_GROUP
+    global _EMBEDDING_GROUP # global 6,
     assert _EMBEDDING_GROUP is None, \
         'embedding group is already initialized'
 
@@ -402,7 +402,7 @@ def get_tensor_model_parallel_src_rank():
     global_rank = torch.distributed.get_rank() # 当前gpu的全局rank
     local_world_size = get_tensor_model_parallel_world_size()
     return (global_rank // local_world_size) * local_world_size
-    # (0...15//2)*2
+    # (0...15//2)*2 TODO 什么含义?
 
 def get_pipeline_model_parallel_first_rank():
     assert _PIPELINE_GLOBAL_RANKS is not None, \
@@ -454,7 +454,8 @@ def get_data_parallel_rank():
     # 返回的是relative rank, 0 or 1
 
 def destroy_model_parallel():
-    """Set the groups to none.""" 
+    """Set the groups to none. - used for testing only TODO """ 
+    # TODO
     # tensor, pipeline, data三个大方向！
     # 其中tensor, pipeline属于模型的并行化；
     # data属于数据的并行化：
@@ -465,3 +466,10 @@ def destroy_model_parallel():
     _PIPELINE_MODEL_PARALLEL_GROUP = None
     global _DATA_PARALLEL_GROUP
     _DATA_PARALLEL_GROUP = None
+
+    # appended by xianchaow@nvidia.com
+    global _MODEL_PARALLEL_GROUP
+    _MODEL_PARALLEL_GROUP = None
+    global _EMBEDDING_GROUP
+    _EMBEDDING_GROUP = None
+

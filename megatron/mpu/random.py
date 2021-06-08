@@ -84,7 +84,7 @@ def _set_cuda_rng_state(new_state, device=-1):
             with device_ctx_manager(device):
                 _C._cuda_setRNGState(new_state)
     else:
-        # newer PyTorch
+        # newer PyTorch, -> came to here when debugging!
         if device == -1:
             device = torch.device('cuda')
         elif isinstance(device, str):
@@ -97,7 +97,7 @@ def _set_cuda_rng_state(new_state, device=-1):
             if idx is None:
                 idx = torch.cuda.current_device()
             default_generator = torch.cuda.default_generators[idx]
-            default_generator.set_state(new_state)
+            default_generator.set_state(new_state) # 什么是 rng state? TODO the state of the algorithm which produces pseudo random numbers；随机数生成器有个管理的state...
 
     _lazy_call(cb)
 
@@ -163,14 +163,14 @@ class CudaRNGStatesTracker:
     def add(self, name, seed):
         """Track the rng state."""
         # Check seed is not already used.
-        if seed in self.seeds_:
+        if seed in self.seeds_: # e.g., 3952=seed, self.seeds_={} empty set
             raise Exception('seed {} already exists'.format(seed))
         self.seeds_.add(seed)
         # Check that state is not already defined.
-        if name in self.states_:
+        if name in self.states_: # 'model-parallel-rng'
             raise Exception('cuda rng state {} already exists'.format(name))
         # Get the current rng state.
-        orig_rng_state = torch.cuda.get_rng_state()
+        orig_rng_state = torch.cuda.get_rng_state() # torch.Size([816])
         # Set the new state and store it.
         torch.cuda.manual_seed(seed)
         self.states_[name] = torch.cuda.get_rng_state()
@@ -225,7 +225,7 @@ def model_parallel_cuda_manual_seed(seed):
                               model parallel regions.
     """
     # 2718 is just for fun and any POSITIVE value will work.
-    offset = seed + 2718
+    offset = seed + 2718 # e.g., 1234 + 2718 = 3952
     tensor_model_parallel_seed = offset + get_tensor_model_parallel_rank()
     # Data parallel gets the original seed.
     data_parallel_seed = seed
@@ -241,7 +241,7 @@ def model_parallel_cuda_manual_seed(seed):
     # Set the default state.
     torch.cuda.manual_seed(data_parallel_seed)
     # and model parallel state.
-    _CUDA_RNG_STATE_TRACKER.add(_MODEL_PARALLEL_RNG_TRACKER_NAME,
+    _CUDA_RNG_STATE_TRACKER.add(_MODEL_PARALLEL_RNG_TRACKER_NAME, # 'model-parallel-rng'
                                 tensor_model_parallel_seed)
 
 

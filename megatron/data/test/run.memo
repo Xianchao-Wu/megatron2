@@ -1,0 +1,4 @@
+-rw-r--r-- 1 root root  596 Jun  1 06:04 test_indexed_dataset.sh
+-rw-rw-r-- 1 1003 1003  616 Jun  1 04:56 test_preprocess_data.sh
+
+these two bash works good, when using pdb for pytorch debugging!

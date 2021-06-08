@@ -13,12 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+#sys.path.append("../..")
+import os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(script_dir, '../../..'))
+sys.path.append(os.path.join(script_dir, '../..'))
+
 from commons import print_separator
 from commons import initialize_distributed
 import mpu
 import torch
-import sys
-sys.path.append("../..")
 
 
 def test_initialize_model_parallel(tensor_model_parallel_size):
@@ -32,8 +37,9 @@ def test_initialize_model_parallel(tensor_model_parallel_size):
     mpu.initialize_model_parallel(tensor_model_parallel_size_)
     assert mpu.model_parallel_is_initialized()
 
-    # Checks.
+    # Checks. 定义的内部函数：
     def check(group, world_size, rank):
+        # 根据给定的group，去确定该group的world_size（GPU的数量)，以及当前gpu在此group中的rank:
         assert world_size == torch.distributed.get_world_size(group=group)
         assert rank == torch.distributed.get_rank(group=group)
 
@@ -84,12 +90,15 @@ def test_get_tensor_model_parallel_src_rank(tensor_model_parallel_size_):
 
 if __name__ == '__main__':
 
-    initialize_distributed()
+    initialize_distributed() # from commons.py
     world_size = torch.distributed.get_world_size()
     tensor_model_parallel_size = 1
     while tensor_model_parallel_size <= world_size:
+
         print_separator('test initialize model parallel')
-        test_initialize_model_parallel(tensor_model_parallel_size)
+        test_initialize_model_parallel(tensor_model_parallel_size) # TODO
+
         print_separator('test model parallel source rank')
-        test_get_tensor_model_parallel_src_rank(tensor_model_parallel_size)
+        test_get_tensor_model_parallel_src_rank(tensor_model_parallel_size) # TODO
         tensor_model_parallel_size *= 2
+

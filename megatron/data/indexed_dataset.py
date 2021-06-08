@@ -353,7 +353,7 @@ class IndexedDatasetBuilder(object):
 
 
 def _warmup_mmap_file(path):
-    with open(path, 'rb') as stream:
+    with open(path, 'rb') as stream: # idx file
         while stream.read(100 * 1024 * 1024):
             pass
 
@@ -434,13 +434,13 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                 )
                 version = struct.unpack('<Q', stream.read(8)) # 读取8个bytes，Q=unsigned long long(C语言)->long(python)
                 # read part 2, with 8 bytes
-                assert (1,) == version
+                assert (1,) == version # attention, TODO, this is (1,), not 1! a tuple now
 
                 dtype_code, = struct.unpack('<B', stream.read(1)) # B=unsigned char (C) -> integer (python)
                 # read part 3, with 1 bypte
 
                 self._dtype = dtypes[dtype_code] # 1到8，分别对应不同的数据类型
-                self._dtype_size = self._dtype().itemsize # not used
+                self._dtype_size = self._dtype().itemsize # =2, not used
 
                 self._len = struct.unpack('<Q', stream.read(8))[0] # 单个元素的数组？
                 # read part 4, with 8 bytes, len(sizes)，所有文档中所有句子的个数

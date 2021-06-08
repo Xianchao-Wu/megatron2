@@ -119,7 +119,8 @@ def _initialize_affine_weight_cpu(weight, output_size, input_size,
     per_partition_per_stride_size = divide(per_partition_size, stride)
     weight_list = torch.split(master_weight, per_partition_per_stride_size,
                               dim=partition_dim)
-    rank = get_model_parallel_rank()
+    #rank = get_model_parallel_rank() # TODO
+    rank = get_tensor_model_parallel_rank() # TODO
     world_size = get_tensor_model_parallel_world_size() # 当前的gpu所在的"张量-并行群组"group中的gpu的数量
     # alike 2 for groups: [0, 1], [2,3], [4,5], [6,7], [8,9], [10, 11], [12, 13], [14, 15]
     my_weight_list = weight_list[rank::world_size] # 起点为rank，步长为world_size，一直到weight_list的尽头

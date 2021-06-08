@@ -1,26 +1,32 @@
 # This file isn't really a formal automated test, it's just a place to
 # put some code used during development and manual testing of
 # indexed_dataset.
+import os
+import sys
+
+script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(script_dir, "../../../"))
 
 from megatron.data import indexed_dataset
 from megatron.tokenizer import build_tokenizer
 import argparse
-import os
-import sys
+#import os
+#import sys
 
 import torch
 
-script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(script_dir, "../../../"))
+#script_dir = os.path.dirname(os.path.realpath(__file__))
+#sys.path.append(os.path.join(script_dir, "../../../"))
 
 
 def test_indexed_dataset(args):
     ds = indexed_dataset.make_dataset(args.data, args.dataset_impl)
     tokenizer = build_tokenizer(args)
-    print(len(ds.doc_idx))
-    print(len(ds))
-    print(ds.doc_idx[-1])
-    if ds.supports_prefetch:
+    print('len(ds.doc_idx)={}'.format(len(ds.doc_idx)))
+    print('len(ds)={}'.format(len(ds)))
+    print('ds.doc_idx[-1]={}'.format(ds.doc_idx[-1]))
+
+    if ds.supports_prefetch: # False
         # just prefetch the whole thing in test (so assume it is small)
         ds.prefetch(range(len(ds)))
     if args.count > len(ds.doc_idx) - 1:
@@ -41,25 +47,25 @@ def test_indexed_dataset(args):
 
 
 def test_indexed_dataset_get(args):
-    ds = indexed_dataset.make_dataset(args.data, args.dataset_impl)
+    ds = indexed_dataset.make_dataset(args.data, args.dataset_impl) # ds=dataset
     tokenizer = build_tokenizer(args)
-    size = ds.sizes[0]
+    size = ds.sizes[0] # [30 54 16 30 27 40 30  3]'s 30
     print(f"size: {size}")
     full = ds.get(0)
     print(full)
-    # print(tokenizer.detokenize(full.data.tolist()))
+    print(tokenizer.detokenize(full.data.tolist())) # 「オタ」とも呼ばれているこのペラナカン（華人）の特製料理は、とてもおいしいスナック料理です。
     print("---")
     end = ds.get(0, offset=size - 10)
     print(end)
-    # print(tokenizer.detokenize(end.data.tolist()))
+    print(tokenizer.detokenize(end.data.tolist())) # 、とてもおいしいスナック料理です。
 
     start = ds.get(0, length=10)
     print(start)
-    # print(tokenizer.detokenize(start.data.tolist()))
+    print(tokenizer.detokenize(start.data.tolist())) #  「オタ」とも呼ばれているこの
 
     part = ds.get(0, offset=2, length=8)
     print(part)
-    # print(tokenizer.detokenize(part.data.tolist()))
+    print(tokenizer.detokenize(part.data.tolist())) # オタ」とも呼ばれているこの
 
 # def test_albert_dataset(args):
 #     # tokenizer = FullBertTokenizer(args.vocab, do_lower_case=True)
@@ -89,13 +95,18 @@ def main():
 
     group = parser.add_argument_group(title='tokenizer')
     group.add_argument('--tokenizer-type', type=str, required=True,
-                       choices=['BertWordPieceLowerCase',
-                                'GPT2BPETokenizer'],
+                       choices=['BertWordPieceLowerCase', 'BertWordPieceCase', 'BertWordPieceCaseJp',  
+                                'GPT2BPETokenizer', 'GPT2BPETokenizerJp', 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
     group.add_argument('--vocab-file', type=str, default=None,
                        help='Path to the vocab file')
     group.add_argument('--merge-file', type=str, default=None,
                        help='Path to the BPE merge file (if necessary).')
+
+    group.add_argument('--emoji-file', type=str, default=None,
+                        help='Path to the emoji file for Japanese tokenization')
+    group.add_argument('--mecab-dict-path', type=str, default=None,
+                        help='path to the mecab dict file for japanese tokenization')
 
     parser.add_argument('--epochs', type=int, default=5,
                         help='Number of epochs to plan for')
@@ -117,8 +128,12 @@ def main():
     if args.dataset_impl == "infer":
         args.dataset_impl = indexed_dataset.infer_dataset_impl(args.data)
 
-#    test_albert_dataset(args)
+    #    test_albert_dataset(args)
+    print('-'*10 + 'test_indexed_dataset_get(args)' + '-'*10)
     test_indexed_dataset_get(args)
+    print('-'*30)
+    print('-'*10 + 'test_indexed_dataset(args)' + '-'*10)
+    test_indexed_dataset(args)
 
 
 if __name__ == "__main__":

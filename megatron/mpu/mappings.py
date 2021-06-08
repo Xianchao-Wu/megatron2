@@ -177,6 +177,7 @@ def reduce_from_tensor_model_parallel_region(input_): # 全归约-复制
 
 
 def scatter_to_tensor_model_parallel_region(input_): # 切割-拼凑
+    # e.g., input_.shape = torch.Size([13, 17, 11])
     return _ScatterToModelParallelRegion.apply(input_)
 
 

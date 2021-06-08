@@ -528,7 +528,8 @@ def _add_validation_args(parser):
 def _add_data_args(parser):
     group = parser.add_argument_group(title='data and dataloader')
     def_data_path=r'C:\Users\user\source\repos\megatron\megatron\fsi-en-bert-large-cased-small3-win10_text_sentence'
-    def_vocab_file=r'C:\Users\user\source\repos\megatron\megatron\pretrained\bert_en_fsi\bert-large-cased-vocab.txt'
+    #def_vocab_file=r'C:\Users\user\source\repos\megatron\megatron\pretrained\bert_en_fsi\bert-large-cased-vocab.txt'
+    def_vocab_file=r'/workspace/megatron/megatron2/pretrained/bert-large-cased-vocab.txt'
 
     group.add_argument('--data-path', nargs='*', default=def_data_path, #None,
                        help='Path to the training dataset. Accepted format:'

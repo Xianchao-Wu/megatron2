@@ -190,7 +190,7 @@ def main():
     print("Opening", args.input) # input json file
     fin = open(args.input, 'r', encoding='utf-8') # json file， 'C:\\Users\\user\\source\\repos\\megatron\\megatron\\pretrained\\bert_pretrain\\small_data_line_jp.json'
 
-    if nltk_available and args.split_sentences:
+    if nltk_available and args.split_sentences: # True and True
         nltk.download("punkt", quiet=True) # punkt for sentence tokenizer
 
     encoder = Encoder(args)

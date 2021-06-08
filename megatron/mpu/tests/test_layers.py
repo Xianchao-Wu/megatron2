@@ -12,7 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
+import sys
+script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(script_dir, '../../..'))
+sys.path.append(os.path.join(script_dir, '../..'))
 from mpu import layers
 from commons import set_random_seed
 from commons import print_separator
@@ -22,8 +26,8 @@ from torch.nn.parameter import Parameter
 import torch.nn.init as init
 import torch
 import random
-import sys
-sys.path.append("../..")
+from megatron import get_args
+import traceback
 
 
 def test_parallel_embedding(tensor_model_parallel_size):
@@ -42,23 +46,23 @@ def test_parallel_embedding(tensor_model_parallel_size):
     seed = 1236
 
     set_random_seed(123)
-    input_data = torch.LongTensor(
+    input_data = torch.LongTensor( # [17, 23]
         size=(batch_size, seq_length)).random_(0, vocab_size).cuda()
     loss_weight = torch.randn([batch_size, seq_length, hidden_size]).cuda()
 
     set_random_seed(seed)
     embedding_original = torch.nn.Embedding(vocab_size, hidden_size).cuda()
 
-    output = embedding_original(input_data)
-    loss_original = torch.mul(output, loss_weight).sum()
+    output = embedding_original(input_data) # (17,23) -> (17, 23, 16)
+    loss_original = torch.mul(output, loss_weight).sum() # TODO 'mul' for what?
     loss_original.backward()
 
-    set_random_seed(seed)
-    embedding_parallel = layers.ParallelEmbedding(
-        vocab_size, hidden_size, init_method=init.normal_).cuda()
-    output = embedding_parallel(input_data)
-    loss_parallel = torch.mul(output, loss_weight).sum()
-    loss_parallel.backward()
+    #set_random_seed(seed)
+    #embedding_parallel = layers.VocabParallelEmbedding( # TODO  should be ParallelEmbedding(), not VocabParallelEmbedding()!
+    #    vocab_size, hidden_size, init_method=init.normal_).cuda()
+    #output = embedding_parallel(input_data)
+    #loss_parallel = torch.mul(output, loss_weight).sum()
+    #loss_parallel.backward()
 
     set_random_seed(seed)
     embedding_vocab_parallel = layers.VocabParallelEmbedding(
@@ -67,11 +71,12 @@ def test_parallel_embedding(tensor_model_parallel_size):
     loss_vocab_parallel = torch.mul(output, loss_weight).sum()
     loss_vocab_parallel.backward()
 
-    torch.distributed.barrier()
-    error = loss_parallel.sub(loss_original).abs()
-    print('   error in loss (parallel) on global rank {}: {}'.format(
-        torch.distributed.get_rank(), error))
-    assert error < 1.0e-12, 'error: {}'.format(error)
+    # no loss_parallel now, use only the vocab embedding vector layer for testing:
+    #torch.distributed.barrier()
+    #error = loss_parallel.sub(loss_original).abs()
+    #print('   error in loss (parallel) on global rank {}: {}'.format(
+    #    torch.distributed.get_rank(), error))
+    #assert error < 1.0e-12, 'error: {}'.format(error)
 
     torch.distributed.barrier()
     error = loss_vocab_parallel.sub(loss_original).abs()
@@ -121,9 +126,10 @@ def test_initialize_affine_weight(tensor_model_parallel_size):
     # ---------------
     # Column parallel
     # ---------------
-    weight = torch.empty(output_size_coeff, input_size)
+    weight = torch.empty(output_size_coeff, input_size) # [17, 13]
     set_random_seed(seed)
-    layers._initialize_affine_weight(weight, output_size, input_size,
+    #layers._initialize_affine_weight(weight, output_size, input_size,
+    layers._initialize_affine_weight_cpu(weight, output_size, input_size,
 
                                      output_size_coeff, 0,
                                      torch.nn.init.normal_)
@@ -147,7 +153,7 @@ def test_initialize_affine_weight(tensor_model_parallel_size):
     # ------------
     weight = torch.empty(output_size, input_size_coeff)
     set_random_seed(seed)
-    mpu.layers._initialize_affine_weight(weight, output_size, input_size,
+    mpu.layers._initialize_affine_weight_cpu(weight, output_size, input_size,
                                          input_size_coeff, 1,
                                          torch.nn.init.normal_)
     # Target.
@@ -486,45 +492,83 @@ def test_parallel_transformer_layer(tensor_model_parallel_size):
 
 
 if __name__ == '__main__':
-
+    # 固定随机数种子: so that same input will ensure same output:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+    #args = get_args()
+
+    from megatron.global_vars import set_global_variables
+    set_global_variables(extra_args_provider=None,
+            args_defaults={},
+            ignore_unknown_args=False)
+
     initialize_distributed()
     world_size = torch.distributed.get_world_size()
+    
+    if True:
+        print_separator('1.test initialize affine weight')
+        tensor_model_parallel_size = 1
+        while tensor_model_parallel_size <= world_size:
+            test_initialize_affine_weight(tensor_model_parallel_size)
+            tensor_model_parallel_size *= 2
+    try:
+        print_separator('2.test parallel embedding')
+        tensor_model_parallel_size = 1
+        while tensor_model_parallel_size <= world_size:
+            test_parallel_embedding(tensor_model_parallel_size)
+            tensor_model_parallel_size *= 2
+    except Exception:
+        tb = traceback.format_exc()
+        print('Error', tb)
+    finally:
+        mpu.destroy_model_parallel()
 
-    print_separator('test initialize affine weight')
-    tensor_model_parallel_size = 1
-    while tensor_model_parallel_size <= world_size:
-        test_initialize_affine_weight(tensor_model_parallel_size)
-        tensor_model_parallel_size *= 2
+    try:
+        print_separator('3.test column-parallel linear')
+        tensor_model_parallel_size = 1
+        while tensor_model_parallel_size <= world_size:
+            test_column_parallel_linear(tensor_model_parallel_size)
+            tensor_model_parallel_size *= 2
+    except Exception:
+        tb = traceback.format_exc()
+        print('Error', tb)
+    finally:
+        mpu.destroy_model_parallel()
 
-    tensor_model_parallel_size = 1
-    while tensor_model_parallel_size <= world_size:
-        print_separator('test parallel embedding')
-        test_parallel_embedding(tensor_model_parallel_size)
-        tensor_model_parallel_size *= 2
+    try:
+        print_separator('4.test row-parallel linear')
+        tensor_model_parallel_size = 1
+        while tensor_model_parallel_size <= world_size:
+            test_row_parallel_linear(tensor_model_parallel_size)
+            tensor_model_parallel_size *= 2
+    except Exception:
+        tb = traceback.format_exc()
+        print('Error', tb)
+    finally:
+        mpu.destroy_model_parallel()
 
-    print_separator('test column-parallel linear')
-    tensor_model_parallel_size = 1
-    while tensor_model_parallel_size <= world_size:
-        test_column_parallel_linear(tensor_model_parallel_size)
-        tensor_model_parallel_size *= 2
+    try:
+        print_separator('5.test parallel self-attention')
+        tensor_model_parallel_size = 1
+        while tensor_model_parallel_size <= world_size:
+            test_parallel_self_attention(tensor_model_parallel_size)
+            tensor_model_parallel_size *= 2
+    except Exception:
+        tb = traceback.format_exc()
+        print('Error', tb)
+    finally:
+        mpu.destroy_model_parallel()
+    
+    try:
+        print_separator('6.test parallel transformer')
+        tensor_model_parallel_size = 1
+        while tensor_model_parallel_size <= world_size:
+            test_parallel_transformer_layer(tensor_model_parallel_size)
+            tensor_model_parallel_size *= 2
+    except Exception:
+        tb = traceback.format_exc()
+        print('Error', tb)
+    finally:
+        mpu.destroy_model_parallel()
 
-    print_separator('test row-parallel linear')
-    tensor_model_parallel_size = 1
-    while tensor_model_parallel_size <= world_size:
-        test_row_parallel_linear(tensor_model_parallel_size)
-        tensor_model_parallel_size *= 2
-
-    print_separator('test parallel self-attention')
-    tensor_model_parallel_size = 1
-    while tensor_model_parallel_size <= world_size:
-        test_parallel_self_attention(tensor_model_parallel_size)
-        tensor_model_parallel_size *= 2
-
-    print_separator('test parallel transformer')
-    tensor_model_parallel_size = 1
-    while tensor_model_parallel_size <= world_size:
-        test_parallel_transformer_layer(tensor_model_parallel_size)
-        tensor_model_parallel_size *= 2

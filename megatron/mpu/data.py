@@ -23,7 +23,7 @@ from .initialize import get_tensor_model_parallel_src_rank
 _MAX_DATA_DIM = 4 # TODO for what?
 
 
-def _check_data_types(keys, data, target_dtype):
+def _check_data_types(keys, data, target_dtype): # torch.int64
     """Check that all the keys have the same target data type."""
     for key in keys:
         assert data[key].dtype == target_dtype, '{} has data type {} which '\
@@ -32,28 +32,28 @@ def _check_data_types(keys, data, target_dtype):
 
 def _build_key_size_numel_dictionaries(keys, data):
     """Build the size on rank 0 and broadcast."""
-    max_dim = _MAX_DATA_DIM
-    sizes = [0 for _ in range(max_dim) for _ in keys]
+    max_dim = _MAX_DATA_DIM # 4
+    sizes = [0 for _ in range(max_dim) for _ in keys] # 4*5=20, all 0
 
     # Pack the sizes on rank zero.
     if get_tensor_model_parallel_rank() == 0:
         offset = 0
         for key in keys:
             assert data[key].dim() < max_dim, 'you should increase MAX_DATA_DIM'
-            size = data[key].size()
-            for i, s in enumerate(size):
-                sizes[i + offset] = s
+            size = data[key].size() # e.g., torch.Size([7, 11])
+            for i, s in enumerate(size): # (i=0, s=7) and (i=1, s=11)
+                sizes[i + offset] = s 
             offset += max_dim
-
+    # sizes=[7, 11, 0, 0,   8, 2, 1, 0,   13, 0, 0, 0,   5, 1, 2, 0,   5, 12, 0, 0]
     # Move to GPU and broadcast.
-    sizes_cuda = torch.cuda.LongTensor(sizes)
+    sizes_cuda = torch.cuda.LongTensor(sizes) # tensor([ 7, 11,  0,  0,  8,  2,  1,  0, 13,  0,  0,  0,  5,  1,  2,  0,  5, 12,  0,  0], device='cuda:0')
     torch.distributed.broadcast(sizes_cuda, get_tensor_model_parallel_src_rank(),
                                 group=get_tensor_model_parallel_group())
 
     # Move back to cpu and unpack.
     sizes_cpu = sizes_cuda.cpu()
     key_size = {}
-    key_numel = {}
+    key_numel = {} # numel = num of elements in a set
     total_numel = 0
     offset = 0
     for key in keys:
@@ -71,6 +71,9 @@ def _build_key_size_numel_dictionaries(keys, data):
         offset += max_dim
 
     return key_size, key_numel, total_numel
+# key_size: {'key1': [tensor(7), tensor(11)], 'key2': [tensor(8), tensor(2), tensor(1)], 'key3': [tensor(13)], 'key4': [tensor(5), tensor(1), tensor(2)], 'key5': [tensor(5), tensor(12)]}
+# key_numel: {'key1': tensor(77), 'key2': tensor(16), 'key3': tensor(13), 'key4': tensor(10), 'key5': tensor(60)}
+# total_numel: tensor(176)
 
 
 def broadcast_data(keys, data, datatype):

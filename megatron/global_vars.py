@@ -25,7 +25,7 @@ from megatron.tokenizer import build_tokenizer
 from .arguments import parse_args
 from .microbatches import build_num_microbatches_calculator
 
-_GLOBAL_ARGS = None
+_GLOBAL_ARGS = None # TODO need to be initialized!
 _GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
 _GLOBAL_TOKENIZER = None
 _GLOBAL_TENSORBOARD_WRITER = None

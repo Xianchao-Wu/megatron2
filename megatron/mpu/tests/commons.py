@@ -23,11 +23,11 @@ import mpu
 
 
 class IdentityLayer(torch.nn.Module):
-    def __init__(self, size, scale=1.0):
+    def __init__(self, size, scale=1.0): # size (13, 17, 11)
         super(IdentityLayer, self).__init__()
-        self.weight = torch.nn.Parameter(scale * torch.randn(size))
+        self.weight = torch.nn.Parameter(scale * torch.randn(size)) # torch.Size([13, 17, 11])
 
-    def forward(self):
+    def forward(self): # forward function does not take any inputs!
         return self.weight
 
 
@@ -81,3 +81,4 @@ def print_separator(message):
     if torch.distributed.get_rank() == 0:
         print(string, flush=True)
     torch.distributed.barrier()
+
