@@ -18,6 +18,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(script_dir, '../../..'))
 sys.path.append(os.path.join(script_dir, '../..'))
 from mpu import layers
+from model import transformer
 from commons import set_random_seed
 from commons import print_separator
 from commons import initialize_distributed
@@ -45,8 +46,9 @@ def test_parallel_embedding(tensor_model_parallel_size):
     hidden_size = 16
     seed = 1236
 
-    set_random_seed(123)
-    input_data = torch.LongTensor( # [17, 23]
+    #set_random_seed(123)
+    set_random_seed(seed)
+    input_data = torch.LongTensor( # [17, 23], 随机构造输入序列
         size=(batch_size, seq_length)).random_(0, vocab_size).cuda()
     loss_weight = torch.randn([batch_size, seq_length, hidden_size]).cuda()
 
@@ -54,7 +56,7 @@ def test_parallel_embedding(tensor_model_parallel_size):
     embedding_original = torch.nn.Embedding(vocab_size, hidden_size).cuda()
 
     output = embedding_original(input_data) # (17,23) -> (17, 23, 16)
-    loss_original = torch.mul(output, loss_weight).sum() # TODO 'mul' for what?
+    loss_original = torch.mul(output, loss_weight).sum() # element-wise production; TODO 'mul' for what?
     loss_original.backward()
 
     #set_random_seed(seed)
@@ -67,7 +69,7 @@ def test_parallel_embedding(tensor_model_parallel_size):
     set_random_seed(seed)
     embedding_vocab_parallel = layers.VocabParallelEmbedding(
         vocab_size, hidden_size, init_method=init.normal_).cuda()
-    output = embedding_vocab_parallel(input_data)
+    output = embedding_vocab_parallel(input_data) # this output is different with line 57's output...! TODO
     loss_vocab_parallel = torch.mul(output, loss_weight).sum()
     loss_vocab_parallel.backward()
 
@@ -126,22 +128,27 @@ def test_initialize_affine_weight(tensor_model_parallel_size):
     # ---------------
     # Column parallel
     # ---------------
-    weight = torch.empty(output_size_coeff, input_size) # [17, 13]
+    print('--column parallel--')
+    weight = torch.empty(output_size_coeff, input_size) # all zero: [17, 13]
     set_random_seed(seed)
     #layers._initialize_affine_weight(weight, output_size, input_size,
+    # 使用normal_来初始化weight! NOTE 
     layers._initialize_affine_weight_cpu(weight, output_size, input_size,
 
                                      output_size_coeff, 0,
-                                     torch.nn.init.normal_)
+                                     torch.nn.init.normal_) # values in 'weight' now
     # Target.
     set_random_seed(seed)
-    master_weight = torch.empty(output_size, input_size)
-    torch.nn.init.normal_(master_weight)
+    master_weight = torch.empty(output_size, input_size) # all 0
+    torch.nn.init.normal_(master_weight) # 使用了相同的random seed! master_weight = weight!! great! use normal distribution mean=0.0, std=1.0 to fill the input tensor
     rank = mpu.get_tensor_model_parallel_rank()
     my_weight = torch.split(master_weight, output_size_coeff,
                             dim=0)[rank].contiguous().clone()
 
     # Compare.
+    # 1. weight <- layers._initialize_affine_weight_cpu and normal_
+    # 2. my_weight <- master_weight <- normal_
+    # 通过1和2的结果的比较，就可以测试出来1中使用的函数了
     error = weight.sub(my_weight).abs().max()
     torch.distributed.barrier()
     print('   column parallel max error (should be zero) on global rank '
@@ -151,6 +158,7 @@ def test_initialize_affine_weight(tensor_model_parallel_size):
     # ------------
     # Row parallel
     # ------------
+    print('--row parallel--')
     weight = torch.empty(output_size, input_size_coeff)
     set_random_seed(seed)
     mpu.layers._initialize_affine_weight_cpu(weight, output_size, input_size,
@@ -180,14 +188,13 @@ def test_initialize_affine_weight(tensor_model_parallel_size):
 
 
 class IdentityLayer2D(torch.nn.Module):
-    def __init__(self, m, n):
+    def __init__(self, m, n): # m=7, n=13
         super(IdentityLayer2D, self).__init__()
-        self.weight = Parameter(torch.Tensor(m, n))
+        self.weight = Parameter(torch.Tensor(m, n)) # torch.Size([7, 13])
         torch.nn.init.xavier_normal_(self.weight)
 
     def forward(self):
-        return self.weight
-
+        return self.weight # NOTE 直接返回weight的含义？和输入无关的网络？
 
 def test_column_parallel_linear(tensor_model_parallel_size):
 
@@ -210,37 +217,72 @@ def test_column_parallel_linear(tensor_model_parallel_size):
     linear_layer = mpu.ColumnParallelLinear(
         input_size, output_size, keep_master_weight_for_test=True).cuda()
     loss_weight = torch.randn([batch_size, output_size]).cuda()
+
     # Forward
-    input_ = identity_layer()
-    output = linear_layer(input_)
-    loss = torch.mul(output, loss_weight).sum()
+    input_ = identity_layer() # [7=batch.size, 13=input.size]
+    output = linear_layer(input_) # [7=batch.size, 17=output.size]
+    loss = torch.mul(output[0], loss_weight).sum()
+
     # Backward
     loss.backward()
 
     # Values.
-    dLdY = loss_weight
-    X = identity_layer.weight
-    A = linear_layer.master_weight.cuda()
-    dLdA = torch.matmul(dLdY.t(), X)
-    dLdb = torch.matmul(torch.ones(batch_size, 1).cuda().t(), dLdY).view(-1)
-    dLdX = torch.matmul(dLdY, A)
+    dLdY = loss_weight # [7=batch.size, 17=output.size]
+    X = identity_layer.weight # X=input x, A=weight
+    A = linear_layer.master_weight.cuda() # [17=output.size, 13=input.size] TODO no master_weight? -> need to set arguments.py's cpu-init parameter to be default true! then ok.
+    dLdA = torch.matmul(dLdY.t(), X) # [17,7] * [7, 13] -> [17, 13] TODO stange...
+    dLdb = torch.matmul(torch.ones(batch_size, 1).cuda().t(), dLdY).view(-1) # [17]
+    dLdX = torch.matmul(dLdY, A) # [7, 17] * [17, 13] -> [7, 13]
 
     rank = mpu.get_tensor_model_parallel_rank()
+    # simulate dLoss/dweight-A = weight's gradient
     my_dLdA = torch.split(dLdA, output_size_coeff,
                           dim=0)[rank].contiguous().clone()
+
+    # NOTE 1, weight A's gradient comparison:
+    #(Pdb) p my_dLdA[0]
+    #tensor([-0.4328, -0.0613, -0.9401, -0.8437, -0.2938,  1.3285, -1.1106, -0.1666,
+    #             1.0681,  0.0227,  0.4735, -1.7876,  0.1343], device='cuda:0',
+    #                    grad_fn=<SelectBackward>)
+    #(Pdb) p linear_layer.weight.grad[0]
+    #tensor([-0.4328, -0.0613, -0.9401, -0.8437, -0.2938,  1.3285, -1.1106, -0.1666,
+    #             1.0681,  0.0227,  0.4735, -1.7876,  0.1343], device='cuda:0')
+
     error = my_dLdA.sub(linear_layer.weight.grad).abs().max()
     torch.distributed.barrier()
     print('   error in dLdA on global rank {}: {}'.format(
         torch.distributed.get_rank(), error))
     assert error < 1.0e-6
 
+    # simulate dLoss/dbias = bias's gradient
     my_dLdb = torch.split(dLdb, output_size_coeff,
                           dim=0)[rank].contiguous().clone()
+
+    # NOTE 2, bias b's gradient comparison:
+    #(Pdb) p my_dLdb
+    #tensor([-1.4082,  2.0154,  3.9275,  2.7516, -0.5990, -0.0847,  3.5791, -3.7494,
+    #             4.2867, -4.6110,  2.3795, -3.9009,  0.0198, -5.3021, -1.4378, -4.5350,
+    #                      3.0481], device='cuda:0')
+    #(Pdb) p linear_layer.bias.grad
+    #tensor([-1.4082,  2.0154,  3.9275,  2.7516, -0.5990, -0.0847,  3.5791, -3.7494,
+    #             4.2867, -4.6110,  2.3795, -3.9009,  0.0198, -5.3021, -1.4378, -4.5350,
+    #                      3.0481], device='cuda:0')
+
     error = my_dLdb.sub(linear_layer.bias.grad).abs().max()
     torch.distributed.barrier()
     print('   error in dLdb on global rank {}: {}'.format(
         torch.distributed.get_rank(), error))
     assert error < 1.0e-6
+
+    # NOTE 3, input X's gradient comparison:
+    #(Pdb) p dLdX[0]
+    #tensor([ 0.9437, -0.8477, -1.0318,  0.7537, -1.6996,  0.3988,  0.5533,  0.3265,
+    #             0.7638, -1.4018, -0.7501,  0.7525,  0.1920], device='cuda:0')
+    #(Pdb) p identity_layer.weight.grad.shape
+    #torch.Size([7, 13])
+    #(Pdb) p identity_layer.weight.grad[0]
+    #tensor([ 0.9437, -0.8477, -1.0318,  0.7537, -1.6996,  0.3988,  0.5533,  0.3265,
+    #             0.7638, -1.4018, -0.7501,  0.7525,  0.1920], device='cuda:0')
 
     error = dLdX.sub(identity_layer.weight.grad).abs().max()
     torch.distributed.barrier()
@@ -280,7 +322,7 @@ def test_row_parallel_linear(tensor_model_parallel_size):
     # Forward
     input_ = identity_layer()
     output = linear_layer(input_)
-    loss = torch.mul(output, loss_weight).sum()
+    loss = torch.mul(output[0], loss_weight).sum()
     # Backward
     loss.backward()
 
@@ -288,26 +330,35 @@ def test_row_parallel_linear(tensor_model_parallel_size):
     dLdY = loss_weight
     X = identity_layer.weight
     A = linear_layer.master_weight.cuda()
-    dLdA = torch.matmul(dLdY.t(), X)
-    dLdb = torch.matmul(torch.ones(batch_size, 1).cuda().t(), dLdY).view(-1)
-    dLdX = torch.matmul(dLdY, A)
+    dLdA = torch.matmul(dLdY.t(), X) # [17, 7] * [7, 13] -> [17, 13]
+    dLdb = torch.matmul(torch.ones(batch_size, 1).cuda().t(), dLdY).view(-1) # [17]
+    dLdX = torch.matmul(dLdY, A) # [7, 17] * [17, 13] -> [7, 13]
 
     rank = mpu.get_tensor_model_parallel_rank()
     my_dLdA = torch.split(dLdA, input_size_coeff,
                           dim=1)[rank].contiguous().clone()
     error = my_dLdA.sub(linear_layer.weight.grad).abs().max()
+    #(Pdb) p my_dLdA.sum(), linear_layer.weight.grad.sum()
+    #(tensor(-1.3395, device='cuda:0', grad_fn=<SumBackward0>), tensor(-1.3395, device='cuda:0'))
+
     torch.distributed.barrier()
     print('   error in dLdA on global rank {}: {}'.format(
         torch.distributed.get_rank(), error))
     assert error < 1.0e-6
 
     error = dLdb.sub(linear_layer.bias.grad).abs().max()
+    #(Pdb) p dLdb.sum(), linear_layer.bias.grad.sum()
+    #(tensor(-3.6205, device='cuda:0'), tensor(-3.6205, device='cuda:0'))
+
     torch.distributed.barrier()
     print('   error in dLdb on global rank {}: {}'.format(
         torch.distributed.get_rank(), error))
     assert error < 1.0e-6
 
     error = dLdX.sub(identity_layer.weight.grad).abs().max()
+    #(Pdb) p dLdX.sum(), identity_layer.weight.grad.sum()
+    #(tensor(-2.7139, device='cuda:0'), tensor(-2.7139, device='cuda:0'))
+
     torch.distributed.barrier()
     print('   error in dLdX on global rank {}: {}'.format(
         torch.distributed.get_rank(), error))
@@ -347,7 +398,9 @@ def parallel_self_attention(tensor_model_parallel_size, num_att_heads_per_partit
     # Network
     identity_layer = IdentityLayer3D(batch_size, sequence_length,
                                      hidden_size).cuda()
-    attention_layer = mpu.BertParallelSelfAttention(hidden_size, num_att_heads,
+    #attention_layer = mpu.BertParallelSelfAttention(hidden_size, num_att_heads,
+    #import transformer
+    attention_layer = transformer.ParallelSelfAttention(hidden_size, num_att_heads,
                                                     dropout_prob).cuda()
     loss_weight = torch.randn([batch_size, sequence_length, hidden_size]).cuda()
     attention_mask = torch.randn([batch_size, 1, 1, sequence_length]).cuda()

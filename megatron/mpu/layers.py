@@ -355,7 +355,7 @@ class RowParallelLinear(torch.nn.Module):
         init_method: method to initialize weights. Note that bias is always set
                      to zero.
         stride: For the strided linear layers (? stride=1含义? TODO).
-        keep_master_weight_for_test: This was added for testing and should be
+        keep_master_weight_for_test: This was added for testing (TODO okay->mpu/tests/test_layers.py for test only!) and should be
                                      set to False. It returns the master weights
                                      used for initialization.
         skip_bias_add: This was added to enable performance optimations where bias
