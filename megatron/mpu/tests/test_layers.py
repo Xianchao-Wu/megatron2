@@ -400,10 +400,26 @@ def parallel_self_attention(tensor_model_parallel_size, num_att_heads_per_partit
                                      hidden_size).cuda()
     #attention_layer = mpu.BertParallelSelfAttention(hidden_size, num_att_heads,
     #import transformer
-    attention_layer = transformer.ParallelSelfAttention(hidden_size, num_att_heads,
-                                                    dropout_prob).cuda()
+    args = get_args()
+    from megatron.model.bert_model import bert_attention_mask_func
+    attention_mask_func = bert_attention_mask_func # TODO
+
+    from megatron.model.utils import init_method_normal, scaled_init_method_normal
+    init_method = init_method_normal(args.init_method_std)
+    scaled_init_method = scaled_init_method_normal(args.init_method_std, args.num_layers)
+    layer_number = 1 # TODO what is the meaning of layer_number?
+    # mpu.initialize._TENSOR_MODEL_PARALLEL_GROUP is okay until here! NOTE
+    #attention_layer = transformer.ParallelSelfAttention(hidden_size, num_att_heads,
+    #                                                dropout_prob).cuda()
+    attention_layer = transformer.ParallelSelfAttention(attention_mask_func,
+            init_method, scaled_init_method, layer_number).cuda()
+
     loss_weight = torch.randn([batch_size, sequence_length, hidden_size]).cuda()
-    attention_mask = torch.randn([batch_size, 1, 1, sequence_length]).cuda()
+    # TODO this attention_mask is not correct!
+    #attention_mask = torch.randn([batch_size, 1, 1, sequence_length]).cuda()
+    attention_mask = torch.randn([13, 12, 5, 5])#.cuda()
+    attention_mask = attention_mask > 0
+    attention_mask = attention_mask.type(torch.ByteTensor)
     # Forward
     input_ = identity_layer()
     output = attention_layer(input_, attention_mask)
@@ -423,8 +439,8 @@ def test_parallel_self_attention(tensor_model_parallel_size):
         print('> testing ParallelSelfAttention with model parallel '
               'size: {}'.format(tensor_model_parallel_size))
 
-    num_att_heads_per_partition = 3
-    hidden_size_per_att_head = 7
+    num_att_heads_per_partition = 12 # 3
+    hidden_size_per_att_head = 64 # 7
     dropout_prob = 0.0  # has to be zero
     batch_size = 5
     sequence_length = 13

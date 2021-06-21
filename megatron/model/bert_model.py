@@ -29,7 +29,8 @@ from megatron.model.utils import scaled_init_method_normal
 from .module import MegatronModule
 
 def bert_attention_mask_func(attention_scores, attention_mask):
-    attention_scores.masked_fill_(attention_mask, -10000.0)
+    #attention_scores.masked_fill_(attention_mask, -10000.0)
+    attention_scores.masked_fill_(attention_mask.cuda(), torch.tensor(-10000.0).cuda())
     return attention_scores
 
 def bert_extended_attention_mask(attention_mask):

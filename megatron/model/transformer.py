@@ -120,10 +120,13 @@ class ParallelSelfAttention(MegatronModule):
     """
 
     def __init__(self, attention_mask_func, init_method,
-                 output_layer_init_method, layer_number):
+                 output_layer_init_method, layer_number): # layer_number=本self attention layer在整体transformer中的第几层(>=1)
         super(ParallelSelfAttention, self).__init__()
         args = get_args()
         self.fp16 = args.fp16
+        if not mpu.initialize._TENSOR_MODEL_PARALLEL_GROUP:
+            tensor_model_parallel_size = 1
+            mpu.initialize_model_parallel(tensor_model_parallel_size)
 
         self.attention_mask_func = attention_mask_func
         self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling 
