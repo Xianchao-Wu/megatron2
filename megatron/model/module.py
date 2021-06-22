@@ -94,6 +94,9 @@ class MegatronModule(torch.nn.Module):
         # values.
         # TODO 背后的考量是什么？
         # 已知的是：first_stage()和last_stage()构成了当前进程所在的 embedding group!
+
+        if torch.distributed.get_rank() == 0:
+            import pdb; pdb.set_trace()
         if mpu.is_pipeline_first_stage() or mpu.is_pipeline_last_stage():
             torch.distributed.all_reduce(self.word_embeddings_weight().data,
                                          group=mpu.get_embedding_group())

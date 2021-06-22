@@ -81,6 +81,7 @@ def test_parallel_embedding(tensor_model_parallel_size):
     #assert error < 1.0e-12, 'error: {}'.format(error)
 
     torch.distributed.barrier()
+    import pdb; pdb.set_trace()
     error = loss_vocab_parallel.sub(loss_original).abs()
     print('   error in loss (vocab parallel) on global rank {}: {}'.format(
         torch.distributed.get_rank(), error))

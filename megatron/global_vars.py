@@ -171,7 +171,7 @@ def _set_timers():
 def _ensure_var_is_initialized(var, name):
     """Make sure the input variable is not None."""
     assert var is not None, '{} is not initialized.'.format(name)
-
+    # e.g., var = _GLOBAL_ARGS, name = 'args'
 
 def _ensure_var_is_not_initialized(var, name):
     """Make sure the input variable is not None."""

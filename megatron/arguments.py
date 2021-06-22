@@ -247,7 +247,7 @@ def _add_network_size_args(parser):
                        'This is added for computational efficieny reasons.')
     group.add_argument('--layernorm-epsilon', type=float, default=1e-5,
                        help='Layer norm epsilon.')
-    group.add_argument('--apply-residual-connection-post-layernorm',
+    group.add_argument('--apply-residual-connection-post-layernorm', # TODO important!
                        action='store_true',
                        help='If set, use original BERT residula connection '
                        'ordering.')
@@ -293,7 +293,7 @@ def _add_training_args(parser):
                        help='Batch size per model instance (local batch size). ' # 每个模型（整体）的batch size
                        'Global batch size is local batch size times data '
                        'parallel size times number of micro batches.')
-    # global batch size = 每个模型的batch size * data parallel size * 模型的个数
+    # global batch size = 每个模型的batch size (micro-batch-size, 会根据pipeline-group-size再次切割?! TODO ) * data parallel size （TODO ） * 模型的个数
     group.add_argument('--batch-size', type=int, default=None,
                        help='Old batch size parameter, do not use. '
                        'Use --micro-batch-size instead')
@@ -316,14 +316,14 @@ def _add_training_args(parser):
                        ' (1024 - 16) / 8 = 126 intervals will increase'
                        'the batch size linearly to 1024. In each interval'
                        'we will use approximately 300000 / 126 = 2380 samples.')
-    group.add_argument('--checkpoint-activations', action='store_true',
+    group.add_argument('--checkpoint-activations', action='store_true', # TODO detailed logic?
                        help='Checkpoint activation to allow for training '
                        'with larger models, sequences, and batch sizes.')
-    group.add_argument('--distribute-checkpointed-activations',
+    group.add_argument('--distribute-checkpointed-activations', # TODO
                        action='store_true',
                        help='If set, distribute checkpointed activations '
                        'across model parallel group.')
-    group.add_argument('--checkpoint-num-layers', type=int, default=1,
+    group.add_argument('--checkpoint-num-layers', type=int, default=1, # TODO
                        help='chunk size (number of layers) for checkpointing.')
     group.add_argument('--train-iters', type=int, default=10, #None,
                        help='Total number of iterations to train over all '
@@ -340,10 +340,10 @@ def _add_training_args(parser):
                        'by this value.')
     group.add_argument('--exit-duration-in-mins', type=int, default=None,
                        help='Exit the program after this many minutes.')
-    group.add_argument('--tensorboard-dir', type=str, default=None,
+    group.add_argument('--tensorboard-dir', type=str, default=None, # TODO
                        help='Write TensorBoard logs to this directory.')
     group.add_argument('--no-scaled-masked-softmax-fusion',
-                       action='store_true', # win10 only. TODO original is store_false for linux
+                       action='store_false', # 'store_true" for win10 only. TODO original is store_false for linux
                        help='Disable fusion of query_key_value scaling, '
                        'masking, and softmax.',
                        dest='scaled_masked_softmax_fusion')
@@ -444,7 +444,7 @@ def _add_checkpointing_args(parser):
                        help='Load model for finetuning. Do not load optimizer '
                        'or rng state from checkpoint and set iteration to 0. '
                        'Assumed when loading a release checkpoint.')
-
+    # rng state = random number generator's state
     return parser
 
 
@@ -463,7 +463,7 @@ def _add_mixed_precision_args(parser):
                        help='Minimum loss scale for dynamic loss scale.')
     group.add_argument('--loss-scale-window', type=float, default=1000,
                        help='Window over which to raise/lower dynamic scale.')
-    group.add_argument('--hysteresis', type=int, default=2,
+    group.add_argument('--hysteresis', type=int, default=2, # 滞后现象 TODO
                        help='hysteresis for dynamic loss scaling')
     group.add_argument('--fp32-residual-connection', action='store_true',
                        help='Move residual connections to fp32.')
@@ -490,7 +490,7 @@ def _add_distributed_args(parser):
                        help='Degree of tensor model parallelism.')
     group.add_argument('--pipeline-model-parallel-size', type=int, default=1,
                        help='Degree of pipeline model parallelism.')
-    group.add_argument('--model-parallel-size', type=int, default=None,
+    group.add_argument('--model-parallel-size', type=int, default=None, # TODO do not use!
                        help='Old model parallel argument, do not use. Use '
                        '--tensor-model-parallel-size instead.')
     group.add_argument('--distributed-backend', default='nccl',
@@ -507,7 +507,7 @@ def _add_distributed_args(parser):
                        ' and returns function to complete it instead.'
                        'Also turns on --use-cpu-initialization flag.'
                        'This is for external DDP manager.' )
-    group.add_argument('--use-cpu-initialization', action='store_false', #'store_true',
+    group.add_argument('--use-cpu-initialization', action='store_true', #'store_false', TODO, when real bert/gpt training, need to set "store_true"! i.e., default is gpu for initialization.
                        help='If set, affine parallel weights initialization uses CPU' )
     return parser
 
