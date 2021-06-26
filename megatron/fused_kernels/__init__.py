@@ -27,14 +27,14 @@ os.environ["TORCH_CUDA_ARCH_LIST"] = ""
 
 def get_cuda_bare_metal_version(cuda_dir):
     raw_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"],
-                                         universal_newlines=True)# raw_output = 'nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2019 NVIDIA Corporation\nBuilt on Fri_Feb__8_19:08:26_Pacific_Standard_Time_2019\nCuda compilation tools, release 10.1, V10.1.105\n'
+                                         universal_newlines=True)# raw_output = 'nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2019 NVIDIA Corporation\nBuilt on Fri_Feb__8_19:08:26_Pacific_Standard_Time_2019\nCuda compilation tools, release 10.1, V10.1.105\n' <- '/usr/local/cuda/bin/nvcc -V
     output = raw_output.split()
     release_idx = output.index("release") + 1
     release = output[release_idx].split(".")
-    bare_metal_major = release[0] # release = ['10', '1,'] cuda10.1 in win10
+    bare_metal_major = release[0] # release = ['10', '1,'] cuda10.1 in win10; or ['11', '1'] in dgx-1 10.19.60.52 machine! great!
     bare_metal_minor = release[1][0]
 
-    return raw_output, bare_metal_major, bare_metal_minor # 'nvcc:...", '10', '1'
+    return raw_output, bare_metal_major, bare_metal_minor # 'nvcc:...", '10', '1' -> win10; and 'nvcc:...', '11', '1' -> linux
 
 def create_build_dir(buildpath):
     try:
@@ -75,12 +75,12 @@ def load_scaled_masked_softmax_fusion_kernel():
     # TODO for what?
     # Check, if CUDA11 is installed for compute capability 8.0
     cc_flag = []
-    _, bare_metal_major, _ = get_cuda_bare_metal_version(cpp_extension.CUDA_HOME) # '10'
+    _, bare_metal_major, _ = get_cuda_bare_metal_version(cpp_extension.CUDA_HOME) # CUDA_HOME='/usr/local/cuda', '10'
     if int(bare_metal_major) >= 11:
         cc_flag.append('-gencode')
         cc_flag.append('arch=compute_80,code=sm_80')
     # srcpath = WindowsPath('C:/Users/user/source/repos/megatron/megatron/megatron/fused_kernels')
-    srcpath = pathlib.Path(__file__).parent.absolute() # __file__ = 'C:\\Users\\user\\source\\repos\\megatron\\megatron\\megatron\\fused_kernels\\__init__.py'
+    srcpath = pathlib.Path(__file__).parent.absolute() # __file__ = 'C:\\Users\\user\\source\\repos\\megatron\\megatron\\megatron\\fused_kernels\\__init__.py' -> '/workspace/megatron/megatron2/megatron/fused_kernels'
     buildpath = srcpath / 'build' # buildpath = WindowsPath('C:/Users/user/source/repos/megatron/megatron/megatron/fused_kernels/build')
 
     create_build_dir(buildpath)

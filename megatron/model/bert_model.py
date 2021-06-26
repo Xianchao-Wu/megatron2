@@ -140,10 +140,10 @@ class BertModelBase(MegatronModule):
         args = get_args()
 
         self.fp16_lm_cross_entropy = args.fp16_lm_cross_entropy
-        self.add_binary_head = add_binary_head
-        self.parallel_output = parallel_output
+        self.add_binary_head = add_binary_head # True, TODO for what?
+        self.parallel_output = parallel_output # True, TODO for what?
 
-        init_method = init_method_normal(args.init_method_std)
+        init_method = init_method_normal(args.init_method_std) # return method handler, megatron/model/utils.py
         scaled_init_method = scaled_init_method_normal(args.init_method_std,
                                                        args.num_layers)
 
@@ -154,7 +154,7 @@ class BertModelBase(MegatronModule):
             init_method=init_method,
             scaled_init_method=scaled_init_method)
 
-        self.initialize_word_embeddings(init_method_normal)
+        self.initialize_word_embeddings(init_method_normal) # utils.py's init_method_normal
         if mpu.is_pipeline_last_stage():
             self.lm_head = BertLMHead(
                 self.word_embeddings_weight().size(0),

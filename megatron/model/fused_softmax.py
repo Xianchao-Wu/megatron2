@@ -86,12 +86,12 @@ class FusedScaleMaskSoftmax(torch.nn.Module):
     def __init__(self, input_in_fp16, upper_triang_mask_fusion, 
                  general_mask_fusion, mask_func, softmax_in_fp32, scale):
         super(FusedScaleMaskSoftmax, self).__init__()
-        self.input_in_fp16 = input_in_fp16
-        self.upper_triang_mask_fusion = upper_triang_mask_fusion
-        self.general_mask_fusion = general_mask_fusion
-        self.mask_func = mask_func
-        self.softmax_in_fp32 = softmax_in_fp32
-        self.scale = scale
+        self.input_in_fp16 = input_in_fp16 # True
+        self.upper_triang_mask_fusion = upper_triang_mask_fusion # None
+        self.general_mask_fusion = general_mask_fusion # True
+        self.mask_func = mask_func # e.g., bert_attention_mask_func
+        self.softmax_in_fp32 = softmax_in_fp32 # True
+        self.scale = scale # 1
 
         assert self.scale is None or softmax_in_fp32, \
             'softmax should be in fp32 when scaled'

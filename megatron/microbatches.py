@@ -28,7 +28,7 @@ def build_num_microbatches_calculator(args):
             args.data_parallel_size)
         if args.rank == 0:
             print('setting number of micro-batches to constant {}'.format(
-                num_microbatches_calculator.get()), flush=True)
+                num_microbatches_calculator.get()), flush=True) # micro-batches的个数; 如果micro_batch_size=4, data_parallel_size=2 (16gpu, tensor_parallel_size=2, pipeline_parallel_size=4; global_batch_size=32; then 32/(4*2)=4 : 含义4批？每一批是数量为2的data_parallel_group? TODO), "number of micro-batches"! when gpu=1, 32=global_batch_size/(4=micro_batch_size*1)=32/4=8!
 
     else:
         assert len(args.rampup_batch_size) == 3, 'expected the following ' \

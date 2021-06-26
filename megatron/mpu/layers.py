@@ -84,13 +84,13 @@ def _initialize_affine_weight_gpu(weight, init_method,
                                   partition_dim, stride=1):
     """Initialize affine weight for model parallel on GPU."""
 
-    set_tensor_model_parallel_attributes(tensor=weight,
+    set_tensor_model_parallel_attributes(tensor=weight, # torch.Size([29056, 1024])
                                          is_parallel=True, # 属性1
                                          dim=partition_dim, # 属性2
                                          stride=stride) # 属性3
 
     with get_cuda_rng_tracker().fork(): # rng = random number generator
-        init_method(weight)
+        init_method(weight) # megatron/model/utils.py's init_method_normal's init_() method
 
 
 def _initialize_affine_weight_cpu(weight, output_size, input_size,
@@ -147,7 +147,7 @@ class VocabParallelEmbedding(torch.nn.Module):
                  init_method=init.xavier_normal_):
         super(VocabParallelEmbedding, self).__init__()
         # Keep the input dimensions.
-        self.num_embeddings = num_embeddings
+        self.num_embeddings = num_embeddings # vocab size
         self.embedding_dim = embedding_dim
         # Set the detauls for compatibility.
         self.padding_idx = None
@@ -277,7 +277,7 @@ class ColumnParallelLinear(torch.nn.Module):
                 self.output_size_per_partition, 0, init_method,
                 stride=stride, return_master_weight=keep_master_weight_for_test)
         else:
-            self.weight = Parameter(torch.empty(
+            self.weight = Parameter(torch.empty( # e.g., torch.Size([3072, 1024])
                 self.output_size_per_partition, self.input_size, # cai=column of A_i=row of A_i^T=4h/p, rx=row of A=column of A^T=h
                 device=torch.cuda.current_device(), dtype=args.params_dtype)) # device=当前的GPU
             _initialize_affine_weight_gpu(self.weight, init_method,
@@ -291,10 +291,10 @@ class ColumnParallelLinear(torch.nn.Module):
                 self.bias = Parameter(torch.empty(
                     self.output_size_per_partition,
                     device=torch.cuda.current_device(), # device=当前的gpu
-                    dtype=args.params_dtype))
-            self.bias.tensor_model_parallel = True
+                    dtype=args.params_dtype)) # torch.Size([3072])
+            self.bias.tensor_model_parallel = True # TODO for what?
             self.bias.partition_dim = 0
-            self.bias.stride = stride
+            self.bias.stride = stride # 1, TODO for what?
             # Always initialize bias to zero.
             with torch.no_grad():
                 self.bias.zero_()

@@ -311,8 +311,8 @@ class WordpieceTokenizer(object):
 
     def __init__(self, vocab, unk_token="[UNK]", max_input_chars_per_word=200):
         self.vocab = vocab # str:id的词典 ordereddict
-        self.unk_token = unk_token
-        self.max_input_chars_per_word = max_input_chars_per_word
+        self.unk_token = unk_token # '[UNK]'
+        self.max_input_chars_per_word = max_input_chars_per_word # 200
 
     def tokenize(self, text):
         """Tokenizes a piece of text into its word pieces.

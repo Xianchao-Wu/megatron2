@@ -94,7 +94,7 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     global _TRAIN_START_TIME # TODO 问题：为何_TRAIN_START_TIME不是在'initialize_megatron'函数的前面？
     start_time_tensor = torch.cuda.FloatTensor([_TRAIN_START_TIME])
     torch.distributed.all_reduce(start_time_tensor,
-                                 op=torch.distributed.ReduceOp.MIN)
+                                 op=torch.distributed.ReduceOp.MIN) # use MIN operator to do "all-reduce"! can be other operators! such as sum-up, max and so on!
     _TRAIN_START_TIME = start_time_tensor.item()
     print_rank_0('time to initialize megatron (seconds): {:.3f}'.format(
         time.time() - _TRAIN_START_TIME))
@@ -181,7 +181,7 @@ def get_model(model_provider_func):
     args = get_args()
 
     # Build model on cpu.
-    model = model_provider_func()
+    model = model_provider_func() # model_provider() in pretrain_bert.py
 
     # Set tensor model parallel attributes if not set.
     # Only parameters that are already tensor model parallel have these
@@ -267,8 +267,10 @@ def setup_model_and_optimizer(model_provider_func):
 
     model = get_model(model_provider_func)
 
-    unwrapped_model = model
-    while isinstance(unwrapped_model, (torchDDP, LocalDDP, FP16Module)):
+    import pdb; pdb.set_trace()
+
+    unwrapped_model = model # megatron.model.distributed.DistributedDataParallel
+    while isinstance(unwrapped_model, (torchDDP, LocalDDP, FP16Module)): # e.g., is LocalDDP = megatron.model.distributed.DistributedDataParallel
         unwrapped_model = unwrapped_model.module
     optimizer = get_megatron_optimizer(unwrapped_model)
 

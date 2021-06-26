@@ -99,7 +99,7 @@ def _initialize_distributed():
     """Initialize torch.distributed and mpu."""
     args = get_args()
 
-    device_count = torch.cuda.device_count() # 2
+    device_count = torch.cuda.device_count() # 2 -> dgx-1's all 8 are seen!
     if torch.distributed.is_initialized():
 
         if args.rank == 0:
@@ -125,7 +125,7 @@ def _initialize_distributed():
         init_method = 'tcp://'
         master_ip = os.getenv('MASTER_ADDR', 'localhost') # localhost
         master_port = os.getenv('MASTER_PORT', '6000') # '6000'
-        init_method += master_ip + ':' + master_port # init_method = 'tcp://localhost:6000'
+        init_method += master_ip + ':' + master_port # init_method = 'tcp://localhost:6000' -> 'tcp://localhost:6001'
         torch.distributed.init_process_group(
             backend=args.distributed_backend,
             world_size=args.world_size, rank=args.rank,

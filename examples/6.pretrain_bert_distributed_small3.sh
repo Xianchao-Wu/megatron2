@@ -1,9 +1,10 @@
 #!/bin/bash
 
-GPUS_PER_NODE=8
+#GPUS_PER_NODE=8
+GPUS_PER_NODE=1
 # Change for multinode config
 MASTER_ADDR=localhost
-MASTER_PORT=6000
+MASTER_PORT=6002
 NNODES=1
 NODE_RANK=0
 
@@ -15,7 +16,7 @@ WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
 
 #DATA_PATH=<Specify path and file prefix>_text_sentence
-DATA_PATH=/workspace/megatron/megatron2/fsi-en-bert-8files-bert-large-cased-vocab-bwplc-small_text_sentence
+DATA_PATH=/workspace/megatron/megatron2/bin.idx.files/fsi-en-bert-8files-bert-large-cased-vocab-bwplc-small_text_sentence
 #CHECKPOINT_PATH=<Specify path>
 CHECKPOINT_PATH_IN=/workspace/megatron/ngc_models/release_bert_345m_uncased
 CHECKPOINT_PATH_OUT=/workspace/megatron/ngc_models/release_bert_345m_uncased_small
@@ -24,7 +25,7 @@ vocabfn=/workspace/megatron/ngc_models/bert-large-cased-vocab.txt
 
 DISTRIBUTED_ARGS="--nproc_per_node $GPUS_PER_NODE --nnodes $NNODES --node_rank $NODE_RANK --master_addr $MASTER_ADDR --master_port $MASTER_PORT"
 
-python -m torch.distributed.launch $DISTRIBUTED_ARGS \
+python -m pdb -m torch.distributed.launch $DISTRIBUTED_ARGS \
        pretrain_bert.py \
        --num-layers 24 \
        --hidden-size 1024 \

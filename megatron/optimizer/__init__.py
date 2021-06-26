@@ -31,7 +31,7 @@ def _get_params_for_weight_decay_optimization(module):
     """
     args = get_args()
     LayerNorm = import_layernorm(args.fp32_residual_connection)
-
+    import pdb; pdb.set_trace()
     weight_decay_params = {'params': []}
     no_weight_decay_params = {'params': [], 'weight_decay': 0.0}
     for module_ in module.modules():

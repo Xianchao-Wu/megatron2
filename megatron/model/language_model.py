@@ -71,7 +71,7 @@ def get_language_model(attention_mask_func, num_tokentypes, add_pooler,
     if mpu.is_pipeline_first_stage() and mpu.is_pipeline_last_stage():
         cls = TransformerLanguageModel
         kwargs['num_tokentypes'] = num_tokentypes
-        kwargs['add_pooler'] = add_pooler
+        kwargs['add_pooler'] = add_pooler # True
     elif mpu.is_pipeline_first_stage() and not mpu.is_pipeline_last_stage():
         cls = TransformerLanguageModelFirstStage
         kwargs['num_tokentypes'] = num_tokentypes
@@ -103,7 +103,7 @@ class Pooler(MegatronModule):
 
     def __init__(self, hidden_size, init_method):
         super(Pooler, self).__init__()
-        self.dense = get_linear_layer(hidden_size, hidden_size, init_method)
+        self.dense = get_linear_layer(hidden_size, hidden_size, init_method) # init_method=utils.py's init_method_normal() method!
 
     def forward(self, hidden_states, sequence_index=0):
         # hidden_states: [b, s, h] where b=batch size, s=sequence len, h=hidden size
@@ -154,7 +154,7 @@ class Embedding(MegatronModule):
             max_sequence_length, self.hidden_size)
         self._position_embeddings_key = 'position_embeddings'
         # Initialize the position embeddings.
-        self.init_method(self.position_embeddings.weight)
+        self.init_method(self.position_embeddings.weight) # in cpu currently! torch.Size([512, 1024])
 
         # Token type embedding.
         # Add this as an optional field that can be added through
@@ -165,7 +165,7 @@ class Embedding(MegatronModule):
             self.tokentype_embeddings = torch.nn.Embedding(self.num_tokentypes,
                                                            self.hidden_size)
             # Initialize the token-type embeddings.
-            self.init_method(self.tokentype_embeddings.weight)
+            self.init_method(self.tokentype_embeddings.weight) # torch.Size([2, 1024])
         else:
             self.tokentype_embeddings = None
 
@@ -303,10 +303,10 @@ class TransformerLanguageModelBase(MegatronModule):
 
         # Embeddings.
         if mpu.is_pipeline_first_stage():
-            self.embedding = Embedding(self.hidden_size,
-                                       args.padded_vocab_size,
-                                       args.max_position_embeddings,
-                                       args.hidden_dropout,
+            self.embedding = Embedding(self.hidden_size, # 1024
+                                       args.padded_vocab_size, # 29056
+                                       args.max_position_embeddings, # 512
+                                       args.hidden_dropout, # 0.1
                                        self.init_method,
                                        self.num_tokentypes)
             self._embedding_key = 'embedding'
@@ -413,8 +413,8 @@ class TransformerLanguageModel(TransformerLanguageModelBase):
                  num_tokentypes=0,
                  add_pooler=False):
         super(TransformerLanguageModel, self).__init__(
-            attention_mask_func,
-            init_method,
+            attention_mask_func, # e.g., bert_attention_mask_func
+            init_method, # e.g., utils.py's init_method_normal
             output_layer_init_method,
             num_tokentypes=num_tokentypes,
             add_pooler=add_pooler)

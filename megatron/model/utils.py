@@ -41,8 +41,8 @@ def scaled_init_method_normal(sigma, num_layers):
 
 def get_linear_layer(rows, columns, init_method):
     """Simple linear layer with weight initialization."""
-    layer = torch.nn.Linear(rows, columns)
-    init_method(layer.weight)
+    layer = torch.nn.Linear(rows, columns) # rows=input_dimension; columns=output_dimension
+    init_method(layer.weight) # weight's shape is alike ([columns, rows])
     with torch.no_grad():
         layer.bias.zero_()
     return layer

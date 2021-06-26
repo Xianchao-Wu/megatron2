@@ -74,7 +74,7 @@ class ParallelMLP(MegatronModule):
             args.hidden_size, # input.size，最大的隐层维度（按照gpu个数分割前的）= Transformer hidden size
             4 * args.hidden_size, # output.size, 4*最大的隐层维度 = 4 * "Transformer hidden size"
             gather_output=False, # TODO-okay why not True? 不需要gather, 即不需要对XA1, ..., XAp进行“前向拼接，后向切割”处理！
-            init_method=init_method, # 初始化方法
+            init_method=init_method, # 初始化方法 -> utils.py's init_method_normal()
             skip_bias_add=True)
 
         self.bias_gelu_fusion = args.bias_gelu_fusion # default=True, enable or disable "bias and gelu fusion"
@@ -89,7 +89,7 @@ class ParallelMLP(MegatronModule):
             4 * args.hidden_size, # 4 * "Transformer hidden size" 最大的隐层维度
             args.hidden_size, # 最大的隐层维度, 'Transformer hidden size'
             input_is_parallel=True,
-            init_method=output_layer_init_method, # 输出层的初始化方法
+            init_method=output_layer_init_method, # 输出层的初始化方法, utils.py -> scaled_init_method_normal()
             skip_bias_add=True)
          
 
@@ -129,7 +129,7 @@ class ParallelSelfAttention(MegatronModule):
             mpu.initialize_model_parallel(tensor_model_parallel_size)
 
         self.attention_mask_func = attention_mask_func
-        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling 
+        self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling # True 
         # bool：apply (or not) scale Q * K^T by 1 / layer-number
 
         self.attention_softmax_in_fp32 = args.attention_softmax_in_fp32
@@ -138,13 +138,13 @@ class ParallelSelfAttention(MegatronModule):
         self.layer_number = max(1, layer_number)
 
         # Per attention head and per partition values.
-        world_size = mpu.get_tensor_model_parallel_world_size()
+        world_size = mpu.get_tensor_model_parallel_world_size() # NOTE 当前tensor parallel group中的gpu的数量！
         self.hidden_size_per_partition = mpu.divide(args.hidden_size, # transformer hidden size; 每个gpu划分的隐层维度大小
                                                     world_size) # h/p
         self.hidden_size_per_attention_head = mpu.divide(
-            args.hidden_size, args.num_attention_heads) # h/n
+            args.hidden_size, args.num_attention_heads) # h/n - 一个head的hidden_size
         self.num_attention_heads_per_partition = mpu.divide(
-            args.num_attention_heads, world_size) # n/p
+            args.num_attention_heads, world_size) # n/p - 一个gpu上的head的数量
 
         # Strided linear layer. (strided何意？步幅TODO)
         self.query_key_value = mpu.ColumnParallelLinear( # alike q'=Qq, k'=Kk, and v'=Vv
@@ -171,7 +171,7 @@ class ParallelSelfAttention(MegatronModule):
         # Dropout. Note that for a single iteration, this layer will generate
         # different outputs on different number of parallel partitions but
         # on average it should not be partition dependent.
-        self.attention_dropout = torch.nn.Dropout(args.attention_dropout)
+        self.attention_dropout = torch.nn.Dropout(args.attention_dropout) # 0.1
 
         # Output. real case is alike h/p=hp -> h
         self.dense = mpu.RowParallelLinear(
@@ -427,7 +427,7 @@ class ParallelTransformerLayer(MegatronModule):
         args = get_args()
 
         super(ParallelTransformerLayer, self).__init__()
-        self.layer_number = layer_number
+        self.layer_number = layer_number # actually, it is layer_index, from 1 to num_layer_number in transformer, NOTE
 
         self.apply_residual_connection_post_layernorm \
             = args.apply_residual_connection_post_layernorm
@@ -435,15 +435,15 @@ class ParallelTransformerLayer(MegatronModule):
         # Layernorm on the input data.
         LayerNorm = import_layernorm(args.fp32_residual_connection) # from megatron.model import import_layernorm
         self.input_layernorm = LayerNorm(
-            args.hidden_size,
-            eps=args.layernorm_epsilon)
+            args.hidden_size, # 1024
+            eps=args.layernorm_epsilon) # 1e-05
 
         # Self attention.
         self.attention = ParallelSelfAttention(attention_mask_func, init_method,
                                                output_layer_init_method,
                                                layer_number)
-        self.hidden_dropout = args.hidden_dropout
-        self.bias_dropout_fusion = args.bias_dropout_fusion
+        self.hidden_dropout = args.hidden_dropout # 0.1
+        self.bias_dropout_fusion = args.bias_dropout_fusion # True
 
         # Layernorm on the input data.
         self.post_attention_layernorm = LayerNorm(
@@ -543,16 +543,18 @@ class ParallelTransformer(MegatronModule):
         # Number of layers.
         assert args.num_layers % mpu.get_pipeline_model_parallel_world_size() == 0, \
             'num_layers must be divisible by pipeline_model_parallel_size'
-        self.num_layers = args.num_layers // mpu.get_pipeline_model_parallel_world_size()
+        self.num_layers = args.num_layers // mpu.get_pipeline_model_parallel_world_size() # if 24 layers, 4=parallel.size -> one gpu has 24/4=6 layers!
 
         # Transformer layers.
-        def build_layer(layer_number):
+        def build_layer(layer_number): # layer_index, start from 1 to 24; if pipeline_parallel_size=4; then first gpu's 1,2,3,4,5,6; second gpu's 7,8,9,10,11,12; third gpu's 13,14,15,16,17,18; forth gpu's 19,20,21,22,23,24.
             return ParallelTransformerLayer(
                 attention_mask_func, init_method,
                 output_layer_init_method, layer_number)
-        offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers
+        offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers # now self.num_layers= number of layers in current GPU! rank() is the rank of current gpu in current pipeline parallel group! NOTE
+        # NOTE import here:
+        import pdb; pdb.set_trace()
         self.layers = torch.nn.ModuleList(
-            [build_layer(i + 1 + offset) for i in range(self.num_layers)])
+            [build_layer(i + 1 + offset) for i in range(self.num_layers)]) # 自己gpu的一共的层数=self.num_layers!
 
         if mpu.is_pipeline_last_stage():
             # Final layer norm before output.

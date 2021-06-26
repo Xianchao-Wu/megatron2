@@ -74,7 +74,7 @@ def parse_args(extra_args_provider=None, defaults={},
         ' divisible by tensor parallel size ({}) times pipeline paralle ' \
         'size ({})'.format(args.world_size, args.tensor_model_parallel_size,
                            args.pipeline_model_parallel_size)
-    args.data_parallel_size = args.world_size // model_parallel_size
+    args.data_parallel_size = args.world_size // model_parallel_size # TODO important! 例如有16个gpu，tensor_parallel_size=2, pipeline_parallel_size=8, so model_parallel_size=8; and then data_parallel_size=2 -> 一个完整的模型，占用了8个gpu；所以，16个gpu，一共有2个完整的models的copy；再往下就是data parallel size=2，即 data_parallel_size=number of data parallel groups? = number of complete models (2)
     if args.rank == 0:
         print('using world size: {}, data-parallel-size: {}, '
               'tensor-model-parallel size: {}, '
@@ -101,7 +101,7 @@ def parse_args(extra_args_provider=None, defaults={},
         args.global_batch_size = args.micro_batch_size * args.data_parallel_size
         # TODO 为什么是这样计算global_batch_size呢？
         # e.g., micro_batch_size=4, data_parallel_size=8
-        # single-node的时候，类似于8 gpus, 每个gpu上的batch size=4?
+        # single-node的时候，类似于8 gpus, 每个gpu上的batch size=4? 道理：micro_batch_size=4，即一个模型片段上是4个sequences。另外，args.data_parallel_size = 完整的模型的个数，所以可以计算出来global_batch_size=4 * 2(e.g., 16 GPUs and each model is used by 8 gpus = 2 complete models)
         if args.rank == 0:
             print('setting global batch size to {}'.format(
                 args.global_batch_size), flush=True)
@@ -120,7 +120,7 @@ def parse_args(extra_args_provider=None, defaults={},
     args.consumed_valid_samples = 0 # 取值无法从命令行获得！
 
     # Set input defaults.
-    for key in defaults:
+    for key in defaults: # {'tokenizer_type': 'BertWordPieceLowerCase'}
         # For default to be valid, it should not be provided in the
         # arguments that are passed to the program. We check this by
         # ensuring the arg is set to None.
@@ -585,7 +585,7 @@ def _add_data_args(parser):
 def _add_autoresume_args(parser):
     group = parser.add_argument_group(title='autoresume')
 
-    group.add_argument('--adlr-autoresume', action='store_true',
+    group.add_argument('--adlr-autoresume', action='store_true', # TODO what is adlr?
                        help='Enable autoresume on adlr cluster.')
     group.add_argument('--adlr-autoresume-interval', type=int, default=1000,
                        help='Intervals over which check for autoresume'
