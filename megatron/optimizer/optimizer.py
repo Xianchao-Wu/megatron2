@@ -75,7 +75,7 @@ class MegatronOptimizer(ABC):
 
     def __init__(self, optimizer):
         """Input optimizer is the base optimizer for example Adam."""
-        self.optimizer = optimizer
+        self.optimizer = optimizer # FusedAdam, Parameter Group 0's weight_decay=0.01; and Parameter Group 1's weight_decay=0.0
         assert self.optimizer, 'no optimizer is provided.'
 
     def clip_grad_norm(self, clip_grad):
@@ -147,8 +147,8 @@ class FP16OptimizerWithFP16Params(MegatronOptimizer):
     def __init__(self, optimizer, grad_scaler, clip_grad):
         super(FP16OptimizerWithFP16Params, self).__init__(optimizer)
 
-        self.grad_scaler = grad_scaler
-        self.clip_grad = clip_grad
+        self.grad_scaler = grad_scaler # DynamicGradScaler
+        self.clip_grad = clip_grad # 1.0
 
         # Tensor used to determine if a nan/inf has happend.
         # Any non-zero value indicates inf/nan.
@@ -168,7 +168,7 @@ class FP16OptimizerWithFP16Params(MegatronOptimizer):
         self.fp16_groups = []
         self.fp32_from_fp16_groups = []
         self.fp32_from_fp32_groups = []
-
+        import pdb; pdb.set_trace()
         # For all the groups in the original optimizer:
         for param_group in self.optimizer.param_groups:
             fp16_params_this_group = []

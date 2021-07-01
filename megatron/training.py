@@ -109,12 +109,12 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     timers('model and optimizer').stop()
     print_datetime('after model, optimizer, and learning rate '
                    'scheduler are built')
-
+    import pdb; pdb.set_trace()
     # Data stuff.
     timers('train/valid/test data iterators').start()
     train_data_iterator, valid_data_iterator, test_data_iterator \
         = build_train_valid_test_data_iterators(
-            train_valid_test_dataset_provider)
+            train_valid_test_dataset_provider) # 
     timers('train/valid/test data iterators').stop()
     print_datetime('after dataloaders are built')
 
@@ -122,14 +122,14 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     print_rank_0('done with setups ...')
     timers.log(['model and optimizer', 'train/valid/test data iterators'])
     print_rank_0('training ...')
-
+    import pdb; pdb.set_trace()
     iteration = 0
     if args.do_train and args.train_iters > 0:
         iteration = train(forward_step_func,
                           model, optimizer, lr_scheduler,
                           train_data_iterator, valid_data_iterator)
     print_datetime('after training is done')
-
+    import pdb; pdb.set_trace()
     if args.do_valid:
         prefix = 'the end of training for val data'
         evaluate_and_print_results(prefix, forward_step_func,
@@ -187,11 +187,11 @@ def get_model(model_provider_func):
     # Only parameters that are already tensor model parallel have these
     # attributes set for them. We should make sure the default attributes
     # are set for all params so the optimizer can use them.
-    for param in model.parameters():
+    for param in model.parameters(): # e.g., 302 for bert-base-24-layer
         mpu.set_defaults_if_not_set_tensor_model_parallel_attributes(param)
 
     # Print number of parameters.
-    if mpu.get_data_parallel_rank() == 0:
+    if mpu.get_data_parallel_rank() == 0: # e.g., 334,723,458 = 334M or 335M
         print(' > number of parameters on (tensor, pipeline) '
               'model parallel rank ({}, {}): {}'.format(
             mpu.get_tensor_model_parallel_rank(),
@@ -204,7 +204,7 @@ def get_model(model_provider_func):
     # Fp16 conversion.
     if args.fp16:
         model = FP16Module(model)
-
+    # args.DDP_impl = 'local'
     if args.DDP_impl == 'torch': # DDP=distributed data parallel=分布式数据并行
         i = torch.cuda.current_device()
         model = torchDDP(model, device_ids=[i], output_device=i,
@@ -226,7 +226,7 @@ def get_learning_rate_scheduler(optimizer):
     if args.train_iters:
         if args.lr_decay_iters is None:
             args.lr_decay_iters = args.train_iters
-        decay_steps = args.lr_decay_iters * args.global_batch_size
+        decay_steps = args.lr_decay_iters * args.global_batch_size # TODO why? 99 * 32
         if args.lr_warmup_fraction is not None:
             warmup_steps = args.lr_warmup_fraction * decay_steps
         else:
@@ -249,14 +249,14 @@ def get_learning_rate_scheduler(optimizer):
             'either train-iters or train-samples should be provided.')
 
     lr_scheduler = AnnealingLR(
-        optimizer,
+        optimizer, # FP16OptimizerWithFP16Params
         max_lr=args.lr,
         min_lr=args.min_lr,
         warmup_steps=warmup_steps,
         decay_steps=decay_steps,
-        decay_style=args.lr_decay_style,
-        use_checkpoint_lr_scheduler=args.use_checkpoint_lr_scheduler,
-        override_lr_scheduler=args.override_lr_scheduler)
+        decay_style=args.lr_decay_style, # 'linear'
+        use_checkpoint_lr_scheduler=args.use_checkpoint_lr_scheduler, # False
+        override_lr_scheduler=args.override_lr_scheduler) # False
 
     return lr_scheduler
 
@@ -273,16 +273,17 @@ def setup_model_and_optimizer(model_provider_func):
     while isinstance(unwrapped_model, (torchDDP, LocalDDP, FP16Module)): # e.g., is LocalDDP = megatron.model.distributed.DistributedDataParallel
         unwrapped_model = unwrapped_model.module
     optimizer = get_megatron_optimizer(unwrapped_model)
-
+    import pdb; pdb.set_trace()
     lr_scheduler = get_learning_rate_scheduler(optimizer)
 
-    if args.load is not None:
+    if args.load is not None: # load existing checkpoint: '/workspace/megatron/ngc_models/release_bert_345m_uncased'
         timers = get_timers()
         # Extra barrier is added to make sure all ranks report the
         # max time.
         torch.distributed.barrier()
         timers('load checkpoint').start()
-        args.iteration = load_checkpoint(model, optimizer, lr_scheduler)
+        import pdb; pdb.set_trace()
+        args.iteration = load_checkpoint(model, optimizer, lr_scheduler) # model=megatron.model.distributed.DistributedDataParallel; optimizer=megatron.optimizer.optimizer.FP16OptimizerWithFP16Params; lr_scheduler=megatron.learning_rates.AnnealingLR
         torch.distributed.barrier()
         timers('load checkpoint').stop()
         timers.log(['load checkpoint'])
@@ -303,9 +304,9 @@ def setup_model_and_optimizer(model_provider_func):
         print("Initializing ICT from pretrained BERT model", flush=True)
         unwrapped_model.init_state_dict_from_bert()
 
-    # TODO 给unwrapped_model赋值了半天，为啥没有最后返回它呢？
+    # TODO 给unwrapped_model赋值了半天，为啥没有最后返回它呢？ -> 通过指针修改其值了！足够了
     return model, optimizer, lr_scheduler
-
+    # model = megatron.model.distributed.DistributedDataParallel; optimizer = megatron.optimizer.optimizer.FP16OptimizerWithFP16Params; lr_scheduler = megatron.learning_rates.AnnealingLR
 
 def communicate(tensor_send_next, tensor_send_prev, recv_forward, recv_backward):
     """Communicate tensors between stages."""
@@ -502,7 +503,7 @@ def forward_backward_no_pipelining(forward_step_func, data_iterator, model,
                                    optimizer, timers):
     """Run forward and backward passes without inter-stage communication."""
     args = get_args()
-
+    import pdb; pdb.set_trace()
     losses_reduced = []
     for i in range(get_num_microbatches()):
         timers('forward-compute').start()
@@ -789,8 +790,9 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
     # Write args to tensorboard
     write_args_to_tensorboard()
 
+    import pdb; pdb.set_trace()
     # Turn on training mode which enables dropout.
-    model.train()
+    model.train() # just set to training mode!
 
     # Tracking loss.
     total_loss_dict = {}
@@ -975,29 +977,29 @@ def build_train_valid_test_data_iterators(
             args.eval_iters * args.global_batch_size
 
     # Data loader only on rank 0 of each model parallel group.
-    if mpu.get_tensor_model_parallel_rank() == 0:
+    if mpu.get_tensor_model_parallel_rank() == 0: # TODO why? data loader only on rank 0 of each model parallel group. 
 
         # Number of train/valid/test samples.
         if args.train_samples:
             train_samples = args.train_samples
         else:
-            train_samples = args.train_iters * args.global_batch_size
+            train_samples = args.train_iters * args.global_batch_size # TODO important, e.g., 1000 * 32 = 32,000
         eval_iters = (args.train_iters // args.eval_interval + 1) * \
-                     args.eval_iters
+                     args.eval_iters # TODO why * args.eval_iters=10 -> 30 ???
         test_iters = args.eval_iters
         train_val_test_num_samples = [train_samples,
                                       eval_iters * args.global_batch_size,
-                                      test_iters * args.global_batch_size]
+                                      test_iters * args.global_batch_size] # e.g., [32000, 960, 320]
         print_rank_0(' > datasets target sizes (minimum size):')
         print_rank_0('    train:      {}'.format(train_val_test_num_samples[0])) # e.g., 32,000,000
         print_rank_0('    validation: {}'.format(train_val_test_num_samples[1])) # e.g., 64,320
         print_rank_0('    test:       {}'.format(train_val_test_num_samples[2])) # e.g., 320
 
-        # Build the datasets.
+        # Build the datasets. NOTE
         train_ds, valid_ds, test_ds = build_train_valid_test_datasets_provider(
             train_val_test_num_samples)
 
-        # Build dataloders.
+        # Build dataloders. NOTE
         train_dataloader = build_pretraining_data_loader(
             train_ds, args.consumed_train_samples)
         valid_dataloader = build_pretraining_data_loader(
@@ -1010,7 +1012,7 @@ def build_train_valid_test_data_iterators(
         do_test = test_dataloader is not None and args.eval_iters > 0
         # Need to broadcast num_tokens and num_type_tokens.
         flags = torch.cuda.LongTensor(
-            [int(do_train), int(do_valid), int(do_test)])
+                [int(do_train), int(do_valid), int(do_test)]) # e.g., tensor([1, 1, 1]), device='cuda:0'
     else:
         flags = torch.cuda.LongTensor([0, 0, 0])
 
@@ -1039,3 +1041,4 @@ def build_train_valid_test_data_iterators(
         test_data_iterator = None
 
     return train_data_iterator, valid_data_iterator, test_data_iterator
+    # torch.utils.data.dataloader._MultiProcessingDataLoaderIter

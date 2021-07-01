@@ -55,7 +55,7 @@ def update_num_microbatches(consumed_samples, consistency_check=True):
 def get_tokenizer():
     """Return tokenizer."""
     _ensure_var_is_initialized(_GLOBAL_TOKENIZER, 'tokenizer')
-    return _GLOBAL_TOKENIZER
+    return _GLOBAL_TOKENIZER # e.g., megatron.tokenizer.tokenizer._BertWordPieceTokenizer
 
 
 def get_tensorboard_writer():

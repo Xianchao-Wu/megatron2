@@ -69,7 +69,7 @@ class ParallelMLP(MegatronModule):
         super(ParallelMLP, self).__init__()
         args = get_args()
 
-        # [first linear layer] Project to 4h: (alike position-wise feed-forward layer in transformer)
+        # 1. [first linear layer] Project to 4h: (alike position-wise feed-forward layer in transformer)
         self.dense_h_to_4h = mpu.ColumnParallelLinear( # TODO-okay: use mpu's 列并行-linear-layer
             args.hidden_size, # input.size，最大的隐层维度（按照gpu个数分割前的）= Transformer hidden size
             4 * args.hidden_size, # output.size, 4*最大的隐层维度 = 4 * "Transformer hidden size"
@@ -84,7 +84,7 @@ class ParallelMLP(MegatronModule):
         elif args.onnx_safe:
             self.activation_func = erf_gelu
 
-        # [second linear layer] Project back to h.
+        # 2. [second linear layer] Project back to h.
         self.dense_4h_to_h = mpu.RowParallelLinear( # TODO-okay use mpu's 行并行-linear-layer
             4 * args.hidden_size, # 4 * "Transformer hidden size" 最大的隐层维度
             args.hidden_size, # 最大的隐层维度, 'Transformer hidden size'
@@ -94,7 +94,7 @@ class ParallelMLP(MegatronModule):
          
 
     def forward(self, hidden_states):
-
+        import pdb; pdb.set_trace()
         # [s, b, 4hp] (序列长度，批大小，4*一个划分上的隐层维度hp)? TODO-okay
         # 这里应该是一个整体的隐层维度大小（所有gpu的整体）[s, b, 4*h] -> NO, is [s, b, 4h/p] for one gpu!
         intermediate_parallel, bias_parallel = self.dense_h_to_4h(hidden_states)
@@ -186,7 +186,7 @@ class ParallelSelfAttention(MegatronModule):
             num_splits_first=True/False, true for [s,b,num_splits*np*hn] and false for [s,b,np*hn*num_splits]
             3 * n/p * h/n = 3h/p, is only for one gpu!
         """
-        input_shape = mixed_layer.size();
+        input_shape = mixed_layer.size() # [512, 4, 3072]
         if num_splits_first:
             """[s, b, num_splits * np * hn] 
             -->(view) [s, b, num_splits, np, hn] 
@@ -213,12 +213,13 @@ class ParallelSelfAttention(MegatronModule):
             mixed_layer = mixed_layer.transpose(-1, -2).contiguous() # (s, b, np, 3, hn)
         mixed_layer = mixed_layer.view(*input_shape) # 这样，无论num_splits_first是True/False，结果
         # 都一样了，都是(s, b, np*3*hn)
-        # 参照：最初的本方法的输入的时候是(s,b,3*np*hn)，或者(s,b,np*hn*3) --> (s,b,np*3*hn)
+        # 参照：最初的本方法的输入的时候是(s,b,3*np*hn)，或者(s,b,np*hn*3) --> (s,b,np*3*hn) TODO but why?
         
         return mixed_layer
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
+        import pdb; pdb.set_trace()
         # hidden_states: [sq, b, h]
 
         # =====================
@@ -246,13 +247,13 @@ class ParallelSelfAttention(MegatronModule):
         new_tensor_shape = mixed_x_layer.size()[:-1] + \
             (self.num_attention_heads_per_partition, # 每个划分中的 注意力head 的数量 = n/p = np
              3 * self.hidden_size_per_attention_head) # 每个 attention head的对应的hidden size = 3 * h/n = 3 * hn
-        mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
+        mixed_x_layer = mixed_x_layer.view(*new_tensor_shape) # e.g., new_tensor_shape is in shape [512, 4, 16, 192]
 
         # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]， 每个gpu上的head的个数，之后是每个head对应的隐层的维度
         # 也就是说，head的数量，应该>= GPU的数量！
         (query_layer,
          key_layer,
-         value_layer) = mpu.split_tensor_along_last_dim(mixed_x_layer, 3) # 按照最后一列维度，三等分
+         value_layer) = mpu.split_tensor_along_last_dim(mixed_x_layer, 3) # 按照最后一列维度，三等分; -> [512, 4, 16, 64]
 
         # ==================================
         # Adjust key and value for inference
@@ -272,7 +273,7 @@ class ParallelSelfAttention(MegatronModule):
         # Raw attention scores. [b, np, s, s] 完成的是Q*K^T的运算！
         # ===================================
         
-        # [b, np, sq, sk]
+        # [b, np, sq, sk] -> e.g., [4, 16, 512, 512]
         output_size = (query_layer.size(1), 
                        query_layer.size(2), 
                        query_layer.size(0), # sq = sequench length of q
@@ -280,9 +281,9 @@ class ParallelSelfAttention(MegatronModule):
         
         # [sq, b, np, hn] -> [sq, b * np, hn] # batch * num_head_per_gpu -> 相乘之后，类似于组成了新的batch!
         query_layer = query_layer.view(output_size[2],
-                                       output_size[0] * output_size[1], -1) # [sq, b*np, hn]
+                                       output_size[0] * output_size[1], -1) # [sq, b*np, hn] -> [512, 64, 64]
         key_layer = key_layer.view(output_size[3],
-                                   output_size[0] * output_size[1], -1) # [sk, b*np, hn]
+                                   output_size[0] * output_size[1], -1) # [sk, b*np, hn] -> [512, 64, 64]
 
         # preallocating result tensor: [b * np, sq, sk]
         matmul_result = torch.empty(
@@ -290,7 +291,7 @@ class ParallelSelfAttention(MegatronModule):
             output_size[2], 
             output_size[3],
             dtype=query_layer.dtype, 
-            device=torch.cuda.current_device())
+            device=torch.cuda.current_device()) # [64, 512, 512]
 
         # Raw attention scores. matmul_result's shape=[b*np, sq, sk]
         matmul_result = torch.baddbmm(matmul_result, 
@@ -301,7 +302,7 @@ class ParallelSelfAttention(MegatronModule):
 
         # change view to [b, np, sq, sk]
         attention_scores = matmul_result.view(*output_size)
-
+        # [4, 16, 512, 512]
 
         # ==================================================
         # Update attention mask for inference. [b, np, sq, sk]
@@ -342,34 +343,34 @@ class ParallelSelfAttention(MegatronModule):
         # value_layer -> context layer.
         # [sk, b, np, hn] --> [b, np, sq, hn]
 
-        # context layer shape: [b, np, sq, hn]
+        # context layer shape: [b, np, sq, hn] -> e.g., [4, 16, 512, 64]
         output_size = (value_layer.size(1), 
                        value_layer.size(2), 
                        query_layer.size(0), 
                        value_layer.size(3)) 
 
-        # change view [sk, b * np, hn] 
+        # change view [sk, b * np, hn] -> e.g., [512, 64, 64] 
         value_layer = value_layer.view(value_layer.size(0),
                                        output_size[0] * output_size[1], -1)
         
-        # change view [b * np, sq, sk]
+        # change view [b * np, sq, sk] -> e.g., [64, 512, 512]
         attention_probs = attention_probs.view(output_size[0] * output_size[1],
                                                output_size[2], -1)
         
-        # matmul: [b*np, sq, sk] * [b*np, sk, hn] -> [b * np, sq, hn]
+        # matmul: [b*np/64, sq/512, sk/512] * [b*np/64, sk/512, hn/64] -> [b * np/64, sq/512, hn/64]
         context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1)) 
-        # TODO-okay important , X*V^T
+        # TODO -> okay important , X*V^T
         # where X = softmax(Q*K^T/scalar_for_scale)
 
-        # change view [b, np, sq, hn]
+        # change view [b/4=batch.size, np/16, sq/512, hn/64]
         context_layer = context_layer.view(*output_size)
 
-        # [b, np, sq, hn] --> [sq, b, np, hn]
+        # [b/4, np/16, sq/512, hn/64] --> [sq/512, b/4, np/16, hn/64]
         context_layer = context_layer.permute(2, 0, 1, 3).contiguous()
 
-        # [sq, b, np, hn] --> [sq, b, hp=np*hn=n/p*h/n=h/p]
+        # [sq, b, np, hn] --> [sq/512, b/4, 1024=hp=np*hn=n/p*h/n=h/p]
         new_context_layer_shape = context_layer.size()[:-2] + \
-            (self.hidden_size_per_partition,)
+            (self.hidden_size_per_partition,) # 
         context_layer = context_layer.view(*new_context_layer_shape)
 
 
@@ -382,7 +383,7 @@ class ParallelSelfAttention(MegatronModule):
         # 真实情况是h/p作为输入的，大概明白了
 
         if get_key_value:
-            output = [output, present]
+            output = [output, present] # present = (key_layer, value_layer)
 
         return output, bias
 
@@ -432,30 +433,32 @@ class ParallelTransformerLayer(MegatronModule):
         self.apply_residual_connection_post_layernorm \
             = args.apply_residual_connection_post_layernorm
 
-        # Layernorm on the input data.
+        # 1. Layernorm on the input data.
         LayerNorm = import_layernorm(args.fp32_residual_connection) # from megatron.model import import_layernorm
         self.input_layernorm = LayerNorm(
             args.hidden_size, # 1024
             eps=args.layernorm_epsilon) # 1e-05
 
-        # Self attention.
+        # 2. Self attention.
         self.attention = ParallelSelfAttention(attention_mask_func, init_method,
                                                output_layer_init_method,
                                                layer_number)
         self.hidden_dropout = args.hidden_dropout # 0.1
         self.bias_dropout_fusion = args.bias_dropout_fusion # True
 
-        # Layernorm on the input data.
+        # 3. Layernorm on the input data.
         self.post_attention_layernorm = LayerNorm(
             args.hidden_size,
             eps=args.layernorm_epsilon)
 
-        # MLP, h->4h->h
+        # 4. MLP, h->4h->h
         self.mlp = ParallelMLP(init_method,
                                output_layer_init_method)
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
+        import pdb; pdb.set_trace()
+
         # hidden_states: [b, s, h]
         # x -> [self.layernorm] -> x1 -> self.attention -> x2 -> bias_dropout_add_residual -> x3 -> self.mlp -> x4
         # -> bias_dropout_add_residual -> x5
@@ -466,10 +469,10 @@ class ParallelTransformerLayer(MegatronModule):
         layernorm_output = self.input_layernorm(hidden_states)
         # Self attention.
         attention_output, attention_bias = \
-            self.attention(layernorm_output,
+            self.attention(layernorm_output, # [512, 4, 1024]
                            attention_mask,
                            layer_past=layer_past,
-                           get_key_value=get_key_value)
+                           get_key_value=get_key_value) # get_key_value=False
 
         if get_key_value:
             attention_output, presents = attention_output
@@ -478,7 +481,7 @@ class ParallelTransformerLayer(MegatronModule):
         if self.apply_residual_connection_post_layernorm: # layernorm之后是残差链接(bert的原来的做法)
             residual = layernorm_output # 用的是layernorm之后的结果作为x
         else:
-            residual = hidden_states # 原来的输入x
+            residual = hidden_states # 原来的输入x, i.e., before layernorm!
 
         # jit scripting for a nn.module (with dropout) is not 
         # trigerring the fusion kernel. For now, we use two 
@@ -590,7 +593,7 @@ class ParallelTransformer(MegatronModule):
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
-
+        import pdb; pdb.set_trace()
         # Checks.
         if layer_past is not None:
             assert get_key_value, \
@@ -620,7 +623,7 @@ class ParallelTransformer(MegatronModule):
         else:
             if get_key_value:
                 presents = []
-            for index in range(self.num_layers):
+            for index in range(self.num_layers): # e.g., self.num_layers=24
                 layer = self._get_layer(index) # return self.layers[layer_number]
                 past = None
                 if layer_past is not None:

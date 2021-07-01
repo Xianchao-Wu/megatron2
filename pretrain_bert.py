@@ -92,7 +92,7 @@ def forward_step(data_iterator, model, input_tensor):
     """Forward step."""
     args = get_args()
     timers = get_timers()
-
+    import pdb; pdb.set_trace()
     # Get the batch.
     timers('batch-generator').start()
     tokens, types, sentence_order, loss_mask, lm_labels, padding_mask \
@@ -143,18 +143,18 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
                  'for BERT ...')
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
         data_prefix=args.data_path,
-        data_impl=args.data_impl,
-        splits_string=args.split,
-        train_valid_test_num_samples=train_val_test_num_samples,
-        max_seq_length=args.seq_length,
-        masked_lm_prob=args.mask_prob,
-        short_seq_prob=args.short_seq_prob,
-        seed=args.seed,
-        skip_warmup=(not args.mmap_warmup))
+        data_impl=args.data_impl, # 'mmap'
+        splits_string=args.split, # '949, 50, 1'
+        train_valid_test_num_samples=train_val_test_num_samples, # e.g., [32000, 960, 320]
+        max_seq_length=args.seq_length, # 512
+        masked_lm_prob=args.mask_prob, # 0.15
+        short_seq_prob=args.short_seq_prob, # 0.1
+        seed=args.seed, # 1234
+        skip_warmup=(not args.mmap_warmup)) # not False = True = skip_warmup
     print_rank_0("> finished creating BERT datasets ...")
 
     return train_ds, valid_ds, test_ds
-
+    # megatron.data.bert_dataset.BertDataset
 
 if __name__ == "__main__":
 

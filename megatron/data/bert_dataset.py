@@ -63,10 +63,10 @@ class BertDataset(Dataset):
         tokenizer = get_tokenizer()
         self.vocab_id_list = list(tokenizer.inv_vocab.keys())
         self.vocab_id_to_token_dict = tokenizer.inv_vocab
-        self.cls_id = tokenizer.cls
-        self.sep_id = tokenizer.sep
-        self.mask_id = tokenizer.mask
-        self.pad_id = tokenizer.pad
+        self.cls_id = tokenizer.cls # [CLS]
+        self.sep_id = tokenizer.sep # [SEP]
+        self.mask_id = tokenizer.mask # [MASK]
+        self.pad_id = tokenizer.pad # [PAD]
 
     def __len__(self):
         return self.samples_mapping.shape[0]
@@ -74,8 +74,15 @@ class BertDataset(Dataset):
     def __getitem__(self, idx):
         # 根据idx，读取self.samples_mapping里面的索引信息，
         # 并从indexed_dataset中读取sample，然后构造sample
+        #import pdb; pdb.set_trace() # TODO very important! build the sample of dataset!
         start_idx, end_idx, seq_length = self.samples_mapping[idx]
+        print_rank_0('__getitem__: idx={}, start_idx={}, end_idx={}, seq_length={}'.format(idx, start_idx, end_idx, seq_length))
         sample = [self.indexed_dataset[i] for i in range(start_idx, end_idx)]
+        totalseqlen = 0
+        for asample in sample:
+            print_rank_0('__getitem__: len(sample.shape)={}, sample[i].shape={}'.format(len(sample), asample.shape))
+            totalseqlen += asample.shape[0]
+        print_rank_0('__getitem__, total.seq.len={}'.format(totalseqlen))
         # Note that this rng state should be numpy and not python since
         # python randint is inclusive whereas the numpy one is exclusive.
         np_rng = np.random.RandomState(seed=(self.seed + idx))
@@ -121,6 +128,7 @@ def get_samples_mapping_(indexed_dataset,
     # Build the indexed mapping if not exist.
     if torch.distributed.get_rank() == 0 and \
        not os.path.isfile(indexmap_filename):
+        import pdb; pdb.set_trace()
         print(' > WARNING: could not find index map file {}, building '
               'the indices on rank 0 ...'.format(indexmap_filename))
 
@@ -154,7 +162,7 @@ def get_samples_mapping_(indexed_dataset,
                          time.time() - start_time))
     # This should be a barrier but nccl barrier assumes
     # device_index=rank which is not the case for model
-    # parallel case
+    # parallel case # TODO for what here?
     counts = torch.cuda.LongTensor([1])
     torch.distributed.all_reduce(counts, group=mpu.get_data_parallel_group())
     torch.distributed.all_reduce(counts, group=mpu.get_pipeline_model_parallel_group())
@@ -200,8 +208,15 @@ def build_training_sample(sample,
               应该是来自numpy的，上界开；
               如果是来自python自己的话，是上界闭。
     """
-
+    #import pdb; pdb.set_trace()
+    ###breakpoint()
     # step 0: (check) We assume that we have at least two sentences in the sample
+    #print_rank_0('build_training_sample, len(sample)={}\nsample[0].shape={}'.format(len(sample), sample[0].shape))
+    totalseqlen = 0
+    for asample in sample:
+        print_rank_0('build_training_sample: len(sample.shape)={}, sample[i].shape={}'.format(len(sample), asample.shape))
+        totalseqlen += asample.shape[0]
+    print_rank_0('building_training_sample, total.seq.len={}'.format(totalseqlen))
     assert len(sample) > 1
     assert target_seq_length <= max_seq_length
 
@@ -248,5 +263,7 @@ def build_training_sample(sample,
         'loss_mask': loss_mask_np,
         'padding_mask': padding_mask_np,
         'truncated': int(truncated)} # 1代表sequence被截取了；0代表没有被截取
+    ###breakpoint()
+    #import pdb; pdb.set_trace()
     return train_sample
 

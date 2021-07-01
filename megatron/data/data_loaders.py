@@ -38,9 +38,9 @@ def build_pretraining_data_loader(dataset, consumed_samples):
         data_parallel_size=mpu.get_data_parallel_world_size())
 
     # Torch dataloader.
-    return torch.utils.data.DataLoader(dataset,
+    return torch.utils.data.DataLoader(dataset, # megatron.data.bert_dataset.BertDataset
                                        batch_sampler=batch_sampler,
-                                       num_workers=args.num_workers,
+                                       num_workers=args.num_workers, # 2
                                        pin_memory=True)
 
 
@@ -57,7 +57,7 @@ class MegatronPretrainingSampler:
         self.micro_batch_times_data_parallel_size = self.micro_batch_size * \
                                                     data_parallel_size
 
-        # Sanity checks.
+        # Sanity checks. 可用性测试；健全性测试
         assert self.total_samples > 0, \
             'no sample to consume: {}'.format(self.total_samples)
         assert self.consumed_samples < self.total_samples, \

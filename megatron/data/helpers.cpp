@@ -34,10 +34,10 @@ const int32_t LONG_SENTENCE_LEN = 512;
 
 
 void build_blending_indices(py::array_t<uint8_t>& dataset_index, //len=sample size, all 0
-			    py::array_t<int64_t>& dataset_sample_index, //len=sample size, all 0
-			    const py::array_t<double>& weights, //weight for each dataset, in datasets
-			    const int32_t num_datasets, //number of datasets
-			    const int64_t size, // sample size = number of samples
+                py::array_t<int64_t>& dataset_sample_index, //len=sample size, all 0
+                const py::array_t<double>& weights, //weight for each dataset, in datasets
+                const int32_t num_datasets, //number of datasets
+                const int64_t size, // sample size = number of samples
                 const bool verbose) { //torch.distributed.get_rank() == 0 is 0-th gpu or not
   /* Given multiple datasets and a weighting array, build samples
    such that it follows those wieghts.*/
@@ -71,12 +71,12 @@ void build_blending_indices(py::array_t<uint8_t>& dataset_index, //len=sample si
 
     for (int64_t dataset_idx = 1; dataset_idx < num_datasets; ++dataset_idx) {
       double error = weights_ptr[dataset_idx] * sample_idx_double -
-	    static_cast<double>(current_samples[dataset_idx]);
+        static_cast<double>(current_samples[dataset_idx]);
       //error = weight of current dataset * sample idx - number of samples in current dataset
       //TODO what does this mean?
       if (error > max_error) {
-	    max_error = error;
-	    max_error_index = dataset_idx; //index of a dataset, when current sample is assigned
+        max_error = error;
+        max_error_index = dataset_idx; //index of a dataset, when current sample is assigned
         //to that dataset, the error is maximum
       }
     }
@@ -98,9 +98,9 @@ void build_blending_indices(py::array_t<uint8_t>& dataset_index, //len=sample si
     std::cout << " > sample ratios:" << std::endl;
     for (int64_t dataset_idx = 0; dataset_idx < num_datasets; ++dataset_idx) {
       auto ratio = static_cast<double>(current_samples[dataset_idx]) /
-	    static_cast<double>(size);
+        static_cast<double>(size);
       std::cout << "   dataset " << dataset_idx << ", input: " <<
-	    weights_ptr[dataset_idx] << ", achieved: " << ratio << std::endl; 
+        weights_ptr[dataset_idx] << ", achieved: " << ratio << std::endl; 
       //ratio of the number of samples in a dataset_idx / the number of total samples
     }
   }
@@ -108,10 +108,10 @@ void build_blending_indices(py::array_t<uint8_t>& dataset_index, //len=sample si
 
 
 py::array build_sample_idx(const py::array_t<int32_t>& sizes_,
-			   const py::array_t<int32_t>& doc_idx_,
-			   const int32_t seq_length,
-			   const int32_t num_epochs,
-			   const int64_t tokens_per_epoch) {
+               const py::array_t<int32_t>& doc_idx_,
+               const int32_t seq_length,
+               const int32_t num_epochs,
+               const int64_t tokens_per_epoch) {
     /* Sample index (sample_idx) is used for gpt2 like dataset for which
        the documents are flattened and the samples are built based on this
        1-D flatten array. It is a 2D array with sizes [number-of-samples + 1, 2]
@@ -157,22 +157,22 @@ py::array build_sample_idx(const py::array_t<int32_t>& sizes_,
       int32_t remaining_seq_length = seq_length + 1;
       while (remaining_seq_length != 0) {
             // Get the document length.
-	auto doc_id = doc_idx[doc_idx_index];
-	auto doc_length = sizes[doc_id] - doc_offset;
-	// And add it to the current sequence.
-	remaining_seq_length -= doc_length;
-	// If we have more than a full sequence, adjust offset and set
-	// remaining length to zero so we return from the while loop.
-	// Note that -1 here is for the same reason we have -1 in
-	// `_num_epochs` calculations.
-	if (remaining_seq_length <= 0) {
-	  doc_offset += (remaining_seq_length + doc_length - 1);
-	  remaining_seq_length = 0;
-	} else {
-	  // Otherwise, start from the begining of the next document.
-	  ++doc_idx_index;
-	  doc_offset = 0;
-	}
+    auto doc_id = doc_idx[doc_idx_index];
+    auto doc_length = sizes[doc_id] - doc_offset;
+    // And add it to the current sequence.
+    remaining_seq_length -= doc_length;
+    // If we have more than a full sequence, adjust offset and set
+    // remaining length to zero so we return from the while loop.
+    // Note that -1 here is for the same reason we have -1 in
+    // `_num_epochs` calculations.
+    if (remaining_seq_length <= 0) {
+      doc_offset += (remaining_seq_length + doc_length - 1);
+      remaining_seq_length = 0;
+    } else {
+      // Otherwise, start from the begining of the next document.
+      ++doc_idx_index;
+      doc_offset = 0;
+    }
       }
       // Record the sequence.
       sample_idx[2 * sample_index] = doc_idx_index;
@@ -182,8 +182,8 @@ py::array build_sample_idx(const py::array_t<int32_t>& sizes_,
 
     // Method to deallocate memory.
     py::capsule free_when_done(sample_idx, [](void *mem_) {
-	int32_t *mem = reinterpret_cast<int32_t*>(mem_);
-	delete[] mem;
+    int32_t *mem = reinterpret_cast<int32_t*>(mem_);
+    delete[] mem;
       });
 
     // Return the numpy array.
@@ -197,12 +197,12 @@ py::array build_sample_idx(const py::array_t<int32_t>& sizes_,
 
 
 inline int32_t get_target_sample_len(const int32_t short_seq_ratio,
-				     const int32_t max_length,
-				     std::mt19937& rand32_gen) {
+                     const int32_t max_length,
+                     std::mt19937& rand32_gen) {
     /* Training sample length. */
     const auto random_number = rand32_gen();
     if ((random_number % short_seq_ratio) == 0) {
-      return 2 + random_number % (max_length - 1);
+        return 2 + random_number % (max_length - 1);
     }
     return max_length;
 }
@@ -216,7 +216,7 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
                              const int32_t max_seq_length,
                              const double short_seq_prob,
                              const int32_t seed,
-			     const bool verbose) {
+                             const bool verbose) {
     /* Build a mapping of (start-index, end-index, sequence-length) where
        start and end index are the indices of the sentences in the sample
        and sequence-length is the target sequence length.
@@ -238,27 +238,27 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
 
     if (verbose) {
         const auto sent_start_index = docs[0];
-	const auto sent_end_index = docs[docs_.shape(0) - 1];
-	const auto num_sentences = sent_end_index - sent_start_index;
-	cout << "    using:" << endl << std::flush;
-	cout << "     number of documents:            " << docs_.shape(0) - 1 <<
-	  endl << std::flush;
-	cout << "     sentences range:                [" << sent_start_index <<
-	", " << sent_end_index << ")" << endl << std::flush;
-	cout << "     total number of sentences:      " << num_sentences <<
-	  endl << std::flush;
-	cout << "     number of epochs:               " << num_epochs <<
-	  endl << std::flush;
-	cout << "     maximum number of samples:      " << max_num_samples <<
-	  endl << std::flush;
-	cout << "     maximum sequence length:        " << max_seq_length <<
-	  endl << std::flush;
-	cout << "     short sequence probability:     " << short_seq_prob <<
-	endl << std::flush;
-	cout << "     short sequence ration (1/prob): " << short_seq_ratio <<
-	  endl << std::flush;
-	cout << "     seed:                           " << seed << endl <<
-	  std::flush;
+        const auto sent_end_index = docs[docs_.shape(0) - 1];
+        const auto num_sentences = sent_end_index - sent_start_index;
+        cout << "    using:" << endl << std::flush;
+        cout << "     number of documents:            " << docs_.shape(0) - 1 <<
+            endl << std::flush;
+        cout << "     sentences range:                [" << sent_start_index <<
+            ", " << sent_end_index << ")" << endl << std::flush;
+        cout << "     total number of sentences:      " << num_sentences <<
+            endl << std::flush;
+        cout << "     number of epochs:               " << num_epochs <<
+            endl << std::flush;
+        cout << "     maximum number of samples:      " << max_num_samples <<
+            endl << std::flush;
+        cout << "     maximum sequence length:        " << max_seq_length <<
+            endl << std::flush;
+        cout << "     short sequence probability:     " << short_seq_prob <<
+            endl << std::flush;
+        cout << "     short sequence ration (1/prob): " << short_seq_ratio <<
+            endl << std::flush;
+        cout << "     seed:                           " << seed << endl <<
+            std::flush;
     }
 
     // Mapping and it's length (1D).
@@ -279,7 +279,7 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
         // Counters:
         uint64_t empty_docs = 0;
         uint64_t one_sent_docs = 0;
-	uint64_t long_sent_docs = 0;
+        uint64_t long_sent_docs = 0;
 
         // Current map index.
         uint64_t map_index = 0;
@@ -287,10 +287,10 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
         // For each epoch:
         for (int32_t epoch=0; epoch<num_epochs; ++epoch) {
             if (map_index >= max_num_samples) {
-	        if (verbose && (!second)) {
-		  cout << "    reached " << max_num_samples << " samples after "
-		       << epoch << " epochs ..." << endl << std::flush;
-		}
+                if (verbose && (!second)) {
+                    cout << "    reached " << max_num_samples << " samples after "
+                        << epoch << " epochs ..." << endl << std::flush;
+                }
                 break;
             }
             // For each document:
@@ -301,7 +301,7 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
                 const auto sent_index_last = docs[doc + 1];
 
                 // At the begining of the document previous index is the
-		// start index.
+                // start index.
                 auto prev_start_index = sent_index_first;
 
                 // Remaining documents.
@@ -310,27 +310,27 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
                 // Some bookkeeping
                 if ((epoch == 0) && (!second)) {
                     if (num_remain_sent == 0) {
-		        ++empty_docs;
+                        ++empty_docs; // a document with 0 sentence
                     }
                     if (num_remain_sent == 1) {
-		        ++one_sent_docs;
+                        ++one_sent_docs; // a document with 1 sentence
                     }
                 }
 
-		// Detect documents with long sentences.
-		bool contains_long_sentence = false;
-		if (num_remain_sent > 1) {
-		    for (auto sent_index=sent_index_first;
-			 sent_index < sent_index_last; ++sent_index) {
-		        if (sizes[sent_index] > LONG_SENTENCE_LEN){
-			    if ((epoch == 0) && (!second)) {
-			        ++long_sent_docs;
-			    }
-			    contains_long_sentence = true;
-			    break;
-			}
-		    }
-		}
+                // Detect documents with long sentences.
+                bool contains_long_sentence = false;
+                if (num_remain_sent > 1) {
+                    for (auto sent_index=sent_index_first;
+                        sent_index < sent_index_last; ++sent_index) {
+                        if (sizes[sent_index] > LONG_SENTENCE_LEN){
+                            if ((epoch == 0) && (!second)) {
+                                ++long_sent_docs;
+                            }
+                            contains_long_sentence = true;
+                            break;
+                        }
+                    }
+                }
 
                 // If we have more than two sentences.
                 if ((num_remain_sent > 1) && (!contains_long_sentence)) {
@@ -339,53 +339,53 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
                     auto seq_len = int32_t{0};
                     auto num_sent = int32_t{0};
                     auto target_seq_len = get_target_sample_len(short_seq_ratio,
-								max_seq_length,
-								rand32_gen);
+                                max_seq_length,
+                                rand32_gen);
 
                     // Loop through sentences.
                     for (auto sent_index=sent_index_first;
                          sent_index < sent_index_last; ++sent_index) {
 
-		        // Add the size and number of sentences.
-		        seq_len += sizes[sent_index];
-		        ++num_sent;
-			--num_remain_sent;
+                // Add the size and number of sentences.
+                seq_len += sizes[sent_index];
+                ++num_sent;
+            --num_remain_sent;
 
-			// If we have reached the target length.
-			// and if not only one sentence is left in the document.
-			// and if we have at least two sentneces.
-			// and if we have reached end of the document.
-			if (((seq_len >= target_seq_len) &&
-			     (num_remain_sent > 1) &&
-			     (num_sent > 1) ) || (num_remain_sent == 0)) {
+            // If we have reached the target length.
+            // and if not only one sentence is left in the document.
+            // and if we have at least two sentneces.
+            // and if we have reached end of the document.
+            if (((seq_len >= target_seq_len) &&
+                 (num_remain_sent > 1) &&
+                 (num_sent > 1) ) || (num_remain_sent == 0)) {
 
-			    // Check for overflow.
-			    if ((3 * map_index + 2) >
-				std::numeric_limits<int64_t>::max()) {
-			        cout << "number of samples exceeded maximum "
-				     << "allowed by type int64: "
-				     << std::numeric_limits<int64_t>::max()
-				     << endl;
-				throw std::overflow_error("Number of samples");
-			    }
+                // Check for overflow.
+                if ((3 * map_index + 2) >
+                std::numeric_limits<int64_t>::max()) {
+                    cout << "number of samples exceeded maximum "
+                     << "allowed by type int64: "
+                     << std::numeric_limits<int64_t>::max()
+                     << endl;
+                throw std::overflow_error("Number of samples");
+                }
 
-			    // Populate the map.
-			    if (second) {
-			        const auto map_index_0 = 3 * map_index;
-				maps[map_index_0] = static_cast<DocIdx>(prev_start_index);
-				maps[map_index_0 + 1] = static_cast<DocIdx>(sent_index + 1);
-				maps[map_index_0 + 2] = static_cast<DocIdx>(target_seq_len);
-			    }
+                // Populate the map.
+                if (second) {
+                    const auto map_index_0 = 3 * map_index;
+                maps[map_index_0] = static_cast<DocIdx>(prev_start_index);
+                maps[map_index_0 + 1] = static_cast<DocIdx>(sent_index + 1);
+                maps[map_index_0 + 2] = static_cast<DocIdx>(target_seq_len);
+                }
 
-			    // Update indices / counters.
-			    ++map_index;
-			    prev_start_index = sent_index + 1;
-			    target_seq_len = get_target_sample_len(short_seq_ratio,
-								   max_seq_length,
-								   rand32_gen);
-			    seq_len = 0;
-			    num_sent = 0;
-			}
+                // Update indices / counters.
+                ++map_index;
+                prev_start_index = sent_index + 1;
+                target_seq_len = get_target_sample_len(short_seq_ratio,
+                                   max_seq_length,
+                                   rand32_gen);
+                seq_len = 0;
+                num_sent = 0;
+            }
 
                     } // for (auto sent_index=sent_index_first; ...
                 } // if (num_remain_sent > 1) {
@@ -393,18 +393,18 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
         } // for (int epoch=0; epoch < num_epochs; ++epoch) {
 
         if (!second) {
-	    if (verbose) {
-	        cout << "   number of empty documents: " << empty_docs <<
-		  endl << std::flush;
-		cout << "   number of documents with one sentence: " <<
-		  one_sent_docs << endl << std::flush;
-		cout << "   number of documents with long sentences: " <<
-		  long_sent_docs << endl << std::flush;
-		cout << "   will create mapping for " << map_index <<
-		  " samples" << endl << std::flush;
-	    }
-	    assert(maps == NULL);
-	    assert(num_samples < 0);
+        if (verbose) {
+            cout << "   number of empty documents: " << empty_docs <<
+          endl << std::flush;
+        cout << "   number of documents with one sentence: " <<
+          one_sent_docs << endl << std::flush;
+        cout << "   number of documents with long sentences: " <<
+          long_sent_docs << endl << std::flush;
+        cout << "   will create mapping for " << map_index <<
+          " samples" << endl << std::flush;
+        }
+        assert(maps == NULL);
+        assert(num_samples < 0);
             maps = new DocIdx[3*map_index];
             num_samples = static_cast<int64_t>(map_index);
         }
@@ -428,7 +428,7 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
     // Method to deallocate memory.
     py::capsule free_when_done(maps, [](void *mem_) {
             DocIdx *mem = reinterpret_cast<DocIdx*>(mem_);
-	    delete[] mem;
+        delete[] mem;
         });
 
     // Return the numpy array.
@@ -448,22 +448,22 @@ py::array build_mapping(const py::array_t<int64_t>& docs_,
                         const int max_seq_length,
                         const double short_seq_prob,
                         const int seed,
-			const bool verbose) {
+            const bool verbose) {
 
     if (sizes_.size() > std::numeric_limits<uint32_t>::max()) {
         if (verbose) {
-	   cout << "    using uint64 for data mapping..." << endl << std::flush;
-	}
-	return build_mapping_impl<uint64_t>(docs_, sizes_, num_epochs,
-					    max_num_samples, max_seq_length,
-					    short_seq_prob, seed, verbose);
+       cout << "    using uint64 for data mapping..." << endl << std::flush;
+    }
+    return build_mapping_impl<uint64_t>(docs_, sizes_, num_epochs,
+                        max_num_samples, max_seq_length,
+                        short_seq_prob, seed, verbose);
     } else {
        if (verbose) {
-	   cout << "    using uint32 for data mapping..." << endl << std::flush;
+       cout << "    using uint32 for data mapping..." << endl << std::flush;
        }
        return build_mapping_impl<uint32_t>(docs_, sizes_, num_epochs,
-					   max_num_samples, max_seq_length,
-					   short_seq_prob, seed, verbose);
+                       max_num_samples, max_seq_length,
+                       short_seq_prob, seed, verbose);
     }
 }
 
@@ -567,10 +567,10 @@ py::array build_blocks_mapping_impl(const py::array_t<int64_t>& docs_,
                 // Some bookkeeping
                 if ((epoch == 0) && (!second)) {
                     if (num_remain_sent == 0) {
-		                ++empty_docs;
+                        ++empty_docs;
                     }
                     if (num_remain_sent == 1) {
-		                ++one_sent_docs;
+                        ++one_sent_docs;
                     }
                 }
                 // Detect documents with long sentences.
@@ -638,7 +638,7 @@ py::array build_blocks_mapping_impl(const py::array_t<int64_t>& docs_,
 
         if (!second) {
             if (verbose) {
-	        cout << "   number of empty documents: " << empty_docs <<
+            cout << "   number of empty documents: " << empty_docs <<
               endl << std::flush;
             cout << "   number of documents with one sentence: " <<
               one_sent_docs << endl << std::flush;
@@ -673,7 +673,7 @@ py::array build_blocks_mapping_impl(const py::array_t<int64_t>& docs_,
     // Method to deallocate memory.
     py::capsule free_when_done(maps, [](void *mem_) {
             DocIdx *mem = reinterpret_cast<DocIdx*>(mem_);
-	    delete[] mem;
+        delete[] mem;
         });
 
     // Return the numpy array.
@@ -697,13 +697,13 @@ py::array build_blocks_mapping(const py::array_t<int64_t>& docs_,
 
     if (sizes_.size() > std::numeric_limits<uint32_t>::max()) {
         if (verbose) {
-	   cout << "    using uint64 for data mapping..." << endl << std::flush;
-	}
-	return build_blocks_mapping_impl<uint64_t>(docs_, sizes_, titles_sizes_,
-	                    num_epochs, max_num_samples, max_seq_length, seed, verbose, use_one_sent_blocks);
+       cout << "    using uint64 for data mapping..." << endl << std::flush;
+    }
+    return build_blocks_mapping_impl<uint64_t>(docs_, sizes_, titles_sizes_,
+                        num_epochs, max_num_samples, max_seq_length, seed, verbose, use_one_sent_blocks);
     } else {
        if (verbose) {
-	   cout << "    using uint32 for data mapping..." << endl << std::flush;
+       cout << "    using uint32 for data mapping..." << endl << std::flush;
        }
        return build_blocks_mapping_impl<uint32_t>(docs_, sizes_, titles_sizes_,
                         num_epochs, max_num_samples, max_seq_length, seed, verbose, use_one_sent_blocks);

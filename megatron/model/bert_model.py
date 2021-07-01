@@ -36,11 +36,11 @@ def bert_attention_mask_func(attention_scores, attention_mask):
 def bert_extended_attention_mask(attention_mask):
     # We create a 3D attention mask from a 2D tensor mask.
     # [b, 1, s]
-    attention_mask_b1s = attention_mask.unsqueeze(1)
+    attention_mask_b1s = attention_mask.unsqueeze(1) # [4, 512] -> [4, 1, 512]
     # [b, s, 1]
-    attention_mask_bs1 = attention_mask.unsqueeze(2)
+    attention_mask_bs1 = attention_mask.unsqueeze(2) # [4, 512, 1]
     # [b, s, s]
-    attention_mask_bss = attention_mask_b1s * attention_mask_bs1 # TODO strange, (1,s) * (s,1) -> (1,1)?
+    attention_mask_bss = attention_mask_b1s * attention_mask_bs1 # TODO strange, (1,s) * (s,1) -> (1,1)? -> not strange anymore -> since its shape = [4, 512, 512] -> * is element-wise production -> will extend automatically!
     # [b, 1, s, s]
     extended_attention_mask = attention_mask_bss.unsqueeze(1)
 
@@ -51,7 +51,7 @@ def bert_extended_attention_mask(attention_mask):
 
 def bert_position_ids(token_ids):
     # Create position ids
-    seq_length = token_ids.size(1)
+    seq_length = token_ids.size(1) # e.g., 512
     
     # position_ids=[0, 1, ..., seq_length-1] -> shape=(1, seq_length)
     position_ids = torch.arange(seq_length, dtype=torch.long,
@@ -86,8 +86,8 @@ class BertLMHead(MegatronModule):
         self.bias.stride = 1
         self.parallel_output = parallel_output
 
-        self.dense = get_linear_layer(hidden_size, hidden_size, init_method)
-        LayerNorm = import_layernorm(args.fp32_residual_connection)
+        self.dense = get_linear_layer(hidden_size, hidden_size, init_method) # weight in CPU!
+        LayerNorm = import_layernorm(args.fp32_residual_connection) # weight in CPU
         self.layernorm = LayerNorm(hidden_size, eps=layernorm_epsilon)
         self.gelu = torch.nn.functional.gelu
         if args.openai_gelu:
@@ -157,12 +157,12 @@ class BertModelBase(MegatronModule):
         self.initialize_word_embeddings(init_method_normal) # utils.py's init_method_normal
         if mpu.is_pipeline_last_stage():
             self.lm_head = BertLMHead(
-                self.word_embeddings_weight().size(0),
+                self.word_embeddings_weight().size(0), # 29056=vocab.size
                 args.hidden_size, init_method, args.layernorm_epsilon, parallel_output)
             self._lm_head_key = 'lm_head'
             self.binary_head = None
             if self.add_binary_head:
-                self.binary_head = get_linear_layer(args.hidden_size, 2,
+                self.binary_head = get_linear_layer(args.hidden_size, 2, # binary-classification!
                                                     init_method)
                 self._binary_head_key = 'binary_head'
 
@@ -245,6 +245,7 @@ class BertModel(BertModelBase):
 
     def forward(self, input_ids, attention_mask,
                 tokentype_ids=None, lm_labels=None):
+        import pdb; pdb.set_trace()
         return super(BertModel, self).forward(
             input_ids,
             attention_mask,
@@ -260,6 +261,7 @@ class BertModelFirstStage(BertModelBase):
 
     def forward(self, input_ids, attention_mask,
                 tokentype_ids=None):
+        import pdb; pdb.set_trace()
         return super(BertModelFirstStage, self).forward(
             input_ids,
             attention_mask,
@@ -273,6 +275,7 @@ class BertModelIntermediateStage(BertModelBase):
             num_tokentypes=num_tokentypes)
 
     def forward(self, hidden_state, attention_mask):
+        import pdb; pdb.set_trace()
         return super(BertModelIntermediateStage, self).forward(
             hidden_state,
             attention_mask)
@@ -289,6 +292,7 @@ class BertModelLastStage(BertModelBase):
 
     def forward(self, hidden_state, attention_mask,
                 lm_labels=None):
+        import pdb; pdb.set_trace()
         return super(BertModelLastStage, self).forward(
             hidden_state,
             attention_mask,

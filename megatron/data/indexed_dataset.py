@@ -89,6 +89,7 @@ def make_dataset(path, impl, skip_warmup=False):
     elif impl == 'cached' and IndexedDataset.exists(path):
         return IndexedCachedDataset(path)
     elif impl == 'mmap' and MMapIndexedDataset.exists(path):
+        import pdb; pdb.set_trace()
         return MMapIndexedDataset(path, skip_warmup)
     print(f"Unknown dataset implementation: {impl}")
     return None
@@ -448,7 +449,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                 self._doc_count = struct.unpack('<Q', stream.read(8))[0]
                 # read part 5, with 8 bytes, len(doc_idx)，文档的个数+1
 
-                offset = stream.tell() # 返回文件的当前位置，即文件指针当前位置
+                offset = stream.tell() # e.g., 34,  返回文件的当前位置，即文件指针当前位置
 
             if not skip_warmup:
                 print_rank_0("    warming up index mmap file...")
@@ -457,24 +458,24 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
             self._bin_buffer_mmap = np.memmap(path, mode='r', order='C')
             self._bin_buffer = memoryview(self._bin_buffer_mmap)
             print_rank_0("    reading sizes...")
-            self._sizes = np.frombuffer( # frombuffer = 将缓冲区解释为一维数组； read part 6
+            self._sizes = np.frombuffer( # frombuffer = 将缓冲区解释为一维数组； read part 6; for example, self._sizes = array([ 26, 284,  24, ...,  59,  23,  25], dtype=int32)
                 self._bin_buffer,
                 dtype=np.int32,
-                count=self._len, # 所有文档中所有句子的个数
+                count=self._len, # 所有文档中所有句子的个数, e.g., 1686984 sentences in 413854 documents
                 offset=offset)
             print_rank_0("    reading pointers...")
             self._pointers = np.frombuffer(self._bin_buffer, dtype=np.int64, count=self._len,
                                            offset=offset + self._sizes.nbytes)
-            # 所有句子的pointer; read part 7
+            # 所有句子的pointer; read part 7; e.g., self._sizes=1,686,984; self._sizes.nbyptes=6,747,936 = 1,686,984 * 4 (one int32 with 8 bytes!)
 
             # nbytes=只是存储数据所占的字节bytes个数
             # a = np.array([[2, 11]], dtype=np.int64)
             # print(a.nbytes) -> 16, 因为int64占8个bytes，这样的话，数据区就是2*8=16了。
 
             print_rank_0("    reading document index...")
-            self._doc_idx = np.frombuffer(self._bin_buffer, dtype=np.int64, count=self._doc_count,
+            self._doc_idx = np.frombuffer(self._bin_buffer, dtype=np.int64, count=self._doc_count, # self._doc_count=413854
                                           offset=offset + self._sizes.nbytes + self._pointers.nbytes)
-            # read part 8, 文档的index，例如[0, 6, 8] _doc_count=真实的文档数量+1
+            # read part 8, 文档的index，例如[0, 6, 8] _doc_count=真实的文档数量+1; or, e.g., (offset=34; self._sizes.nbytes=6,747,936; self._pointers.nbytes=13,495,872=len(self._sizes) * 8 since it is np.int64 = 8 bytes for one int)
 
         def __del__(self):
             self._bin_buffer_mmap._mmap.close()
@@ -517,7 +518,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
     def _do_init(self, path, skip_warmup):
         # path = path without .bin or .idx, i.e., path+'.bin' -> bin file, path+'.idx' -> idx file
         self._path = path
-        self._index = self.Index(index_file_path(self._path), skip_warmup)
+        self._index = self.Index(index_file_path(self._path), skip_warmup) # megatron.data.indexed_dataset.MMapIndexedDataset.Index object
 
         if not skip_warmup:
             print_rank_0("    warming up data mmap file...")

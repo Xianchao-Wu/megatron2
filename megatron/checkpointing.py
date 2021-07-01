@@ -90,7 +90,7 @@ def get_checkpoint_name(checkpoints_path, iteration,
                             'mp_rank_{:02d}'.format(
                                 mpu.get_tensor_model_parallel_rank()),
                             'model_optim_rng.pt')
-    return os.path.join(checkpoints_path, directory,
+    return os.path.join(checkpoints_path, directory, # TODO important for mp=model parallel, not implemented yet!
                         'mp_rank_{:02d}_{:03d}'.format(
                             mpu.get_tensor_model_parallel_rank(),
                             mpu.get_pipeline_model_parallel_rank()),
@@ -182,7 +182,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
     iteration = 0
     release = False
     with open(tracker_filename, 'r') as f:
-        metastring = f.read().strip()
+        metastring = f.read().strip() # 'release'
         try:
             iteration = int(metastring)
         except ValueError:
@@ -204,7 +204,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
     # Load the checkpoint.
     try:
         print('checkpoint_name={}'.format(checkpoint_name))
-        state_dict = torch.load(checkpoint_name, map_location='cpu')
+        state_dict = torch.load(checkpoint_name, map_location='cpu') # TODO important here for loading state_dict into memory!
     except ModuleNotFoundError:
         from megatron.fp16_deprecated import loss_scaler
         # For backward compatibility.
@@ -228,7 +228,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
         iteration = 0
     else:
         try:
-            iteration = state_dict['iteration']
+            iteration = state_dict['iteration'] # 2,000,000
         except KeyError:
             try:  # Backward compatible with older checkpoints
                 iteration = state_dict['total_iters']
@@ -252,7 +252,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
     else:
         print_rank_0('could not find arguments(args) in the checkpoint ...')
 
-    # Model.
+    # Model. TODO important for loading state_dict
     model.load_state_dict(state_dict['model'])
 
     # Optimizer.
@@ -289,7 +289,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
     if torch.distributed.get_rank() == 0:
         print('  successfully loaded checkpoint from {} at iteration {}'.format(
             args.load, iteration), flush=True)
-
+    # args.load='/workspace/megatron/ngc_models/release_bert_345m_uncased', iteration=0
     return iteration
 
 

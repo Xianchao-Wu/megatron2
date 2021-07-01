@@ -186,6 +186,7 @@ class VocabParallelEmbedding(torch.nn.Module):
                                           partition_dim=0, stride=1)
 
     def forward(self, input_):
+        import pdb; pdb.set_trace()
         # input_ 取值和单词在词表中的绝对序号有关系
         if self.tensor_model_parallel_size > 1: # 当前并行群组中gpu的数量
             # Build the mask.
@@ -202,7 +203,7 @@ class VocabParallelEmbedding(torch.nn.Module):
         else:
             masked_input = input_
             # Get the embeddings.
-        output_parallel = F.embedding(masked_input, self.weight,
+        output_parallel = F.embedding(masked_input, self.weight, # self.weight.shape=torch.size([29056, 1024]), so it is embedding weight matrix!
                                       self.padding_idx, self.max_norm,
                                       self.norm_type, self.scale_grad_by_freq,
                                       self.sparse)
@@ -279,18 +280,18 @@ class ColumnParallelLinear(torch.nn.Module):
         else:
             self.weight = Parameter(torch.empty( # e.g., torch.Size([3072, 1024])
                 self.output_size_per_partition, self.input_size, # cai=column of A_i=row of A_i^T=4h/p, rx=row of A=column of A^T=h
-                device=torch.cuda.current_device(), dtype=args.params_dtype)) # device=当前的GPU
+                device=torch.cuda.current_device(), dtype=args.params_dtype)) # device=当前的GPU NOTE this is important!
             _initialize_affine_weight_gpu(self.weight, init_method,
                                           partition_dim=0, stride=stride)
             
         if bias:
             if args.use_cpu_initialization:
                 self.bias = Parameter(torch.empty(
-                    self.output_size_per_partition, dtype=args.params_dtype))
+                    self.output_size_per_partition, dtype=args.params_dtype)) # TODO this is very important! this code only for current GPU's output.size!
             else:
                 self.bias = Parameter(torch.empty(
                     self.output_size_per_partition,
-                    device=torch.cuda.current_device(), # device=当前的gpu
+                    device=torch.cuda.current_device(), # device=当前的gpu # TODO very important! weight of linear layer is at current GPU's memory!!!
                     dtype=args.params_dtype)) # torch.Size([3072])
             self.bias.tensor_model_parallel = True # TODO for what?
             self.bias.partition_dim = 0
@@ -303,6 +304,7 @@ class ColumnParallelLinear(torch.nn.Module):
 
 
     def forward(self, input_):
+        import pdb; pdb.set_trace() # column parallel linear
         # Set up backprop all-reduce. 输入的是整体h，输出的是4h/p被按照gpu分割之后的！
         # “forward复制-backward全归约” - 纵刀流的f (column parallel linear layer)
         input_parallel = copy_to_tensor_model_parallel_region(input_) 
@@ -397,7 +399,7 @@ class RowParallelLinear(torch.nn.Module):
         else:
             self.weight = Parameter(torch.empty(
                 self.output_size, self.input_size_per_partition, # output_size=h, input_size_per_partition=4h/p
-                device=torch.cuda.current_device(), dtype=args.params_dtype))
+                device=torch.cuda.current_device(), dtype=args.params_dtype)) # TODO this is important -> use current GPU to store the parameter weight!
             _initialize_affine_weight_gpu(self.weight, init_method,
                                           partition_dim=1, stride=stride)
         if bias:
@@ -417,6 +419,7 @@ class RowParallelLinear(torch.nn.Module):
 
 
     def forward(self, input_):
+        import pdb; pdb.set_trace()
         # Set up backprop all-reduce. 输入的tensor是被分割到每个gpu的，输出的tensor是整体all-reduce之后的！
         if self.input_is_parallel: # Transformer's MLP使用这个部分:
             input_parallel = input_

@@ -71,7 +71,7 @@ class DistributedDataParallel(MegatronModule):
                         buf.copy_(synced)
         self.hook_handles = []
         self.hooks = []
-        for param in list(self.module.parameters()):
+        for param in list(self.module.parameters()): # TODO why here?
             def allreduce_hook(*unused):
                 Variable._execution_engine.queue_callback(allreduce_params)
         #    handle = param.register_hook(allreduce_hook)

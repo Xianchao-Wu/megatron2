@@ -190,7 +190,7 @@ class Embedding(MegatronModule):
         self.init_method(self.tokentype_embeddings.weight)
 
     def forward(self, input_ids, position_ids, tokentype_ids=None):
-        # Embeddings.
+        import pdb; pdb.set_trace() # Embeddings.
         words_embeddings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = words_embeddings + position_embeddings
@@ -201,7 +201,7 @@ class Embedding(MegatronModule):
             assert self.tokentype_embeddings is None
 
         # Dropout.
-        embeddings = self.embedding_dropout(embeddings)
+        embeddings = self.embedding_dropout(embeddings) # e.g., 210136/1887016=11.1% values are set to 0
 
         return embeddings
 
@@ -317,7 +317,7 @@ class TransformerLanguageModelBase(MegatronModule):
             output_layer_init_method)
         self._transformer_key = 'transformer'
 
-        # Pooler.
+        # Pooler. TODO what for? a linear layer?
         if mpu.is_pipeline_last_stage() and self.add_pooler:
             self.pooler = Pooler(self.hidden_size, self.init_method)
             self._pooler_key = 'pooler'
@@ -326,6 +326,7 @@ class TransformerLanguageModelBase(MegatronModule):
                 tokentype_ids=None, layer_past=None, get_key_value=False,
                 pooling_sequence_index=0):
 
+        import pdb; pdb.set_trace()
         # Embeddings.
         if mpu.is_pipeline_first_stage():
             (input_ids, position_ids) = language_model_input
@@ -422,6 +423,7 @@ class TransformerLanguageModel(TransformerLanguageModelBase):
     def forward(self, input_ids, position_ids, attention_mask,
                 tokentype_ids=None, layer_past=None, get_key_value=False,
                 pooling_sequence_index=0):
+        import pdb; pdb.set_trace()
         return super(TransformerLanguageModel, self).forward(
             (input_ids, position_ids),
             attention_mask,

@@ -521,10 +521,10 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
 
     # Indexed dataset.
     indexed_dataset = get_indexed_dataset_(data_prefix,
-                                           data_impl,
-                                           skip_warmup)
+                                           data_impl, # 'mmap'
+                                           skip_warmup) # True; e.g., num_sent=1686984; num_doc=413853
 
-    if dataset_type == DSET_TYPE_ICT:
+    if dataset_type == DSET_TYPE_ICT: # 'ict'
         args = get_args()
         title_dataset = get_indexed_dataset_(args.titles_data_path,
                                              data_impl,
@@ -533,7 +533,7 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
     # Get start and end indices of train/valid/train into doc-idx
     # Note that doc-idx is desinged to be num-docs + 1 so we can
     # easily iterate over it.
-    total_num_of_documents = indexed_dataset.doc_idx.shape[0] - 1
+    total_num_of_documents = indexed_dataset.doc_idx.shape[0] - 1 # e.g., 413854 - 1 = 413853
     splits = get_train_valid_test_split_(splits_string, total_num_of_documents)
 
     # Print stats about the splits.
@@ -549,9 +549,9 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
         print_rank_0('     sentence indices in [{}, {}) total of {} '
                      'sentences'.format(start_index, end_index,
                                         end_index - start_index))
-    print_split_stats('train', 0)
-    print_split_stats('validation', 1)
-    print_split_stats('test', 2)
+    print_split_stats('train', 0) # 392,746 documents with 1,567,363 sentences
+    print_split_stats('validation', 1) # [392746, 413439] of 20693 documents; [1567363, 1684145] of 116782 sentences 
+    print_split_stats('test', 2) # [413439, 413853] of 414 documents; [1684145, 1686984] of 2839 sentences.
 
     def build_dataset(index, name):
         from megatron.data.bert_dataset import BertDataset
@@ -594,7 +594,7 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
                 )
 
             # Set the original pointer so dataset remains the main dataset.
-            indexed_dataset.set_doc_idx(doc_idx_ptr)
+            indexed_dataset.set_doc_idx(doc_idx_ptr) # TODO for what?
             # Checks.
             assert indexed_dataset.doc_idx[0] == 0
             assert indexed_dataset.doc_idx.shape[0] == \
@@ -606,7 +606,7 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
     test_dataset = build_dataset(2, 'test')
 
     return (train_dataset, valid_dataset, test_dataset)
-
+    # megatron.data.bert_dataset.BertDataset object
 
 def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
 
@@ -629,7 +629,7 @@ def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
     return indexed_dataset
 
 
-def get_train_valid_test_split_(splits_string, size):
+def get_train_valid_test_split_(splits_string, size): # splits_string='949, 50, 1'; size=413853 = # of documents in .bin/.idx
     """ Get dataset splits from comma or '/' separated string list."""
 
     splits = []
@@ -654,4 +654,4 @@ def get_train_valid_test_split_(splits_string, size):
         splits_index[index] -= diff
     assert len(splits_index) == 4
     assert splits_index[-1] == size
-    return splits_index
+    return splits_index # e.g., [0, 392746, 413439, 413853]

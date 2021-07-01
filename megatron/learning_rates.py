@@ -19,7 +19,7 @@ import math
 
 from megatron import print_rank_0
 
-class AnnealingLR(object):
+class AnnealingLR(object): # 退火 learning rate
     """Anneals the learning rate."""
 
     def __init__(self, optimizer, max_lr, min_lr,

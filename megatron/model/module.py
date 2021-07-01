@@ -98,7 +98,7 @@ class MegatronModule(torch.nn.Module):
 
         if torch.distributed.get_rank() == 0:
             import pdb; pdb.set_trace()
-        if mpu.is_pipeline_first_stage() or mpu.is_pipeline_last_stage():
+        if mpu.is_pipeline_first_stage() or mpu.is_pipeline_last_stage(): # TODO important for, first stage and last stage -> all_reduce!
             torch.distributed.all_reduce(self.word_embeddings_weight().data,
                                          group=mpu.get_embedding_group())
 

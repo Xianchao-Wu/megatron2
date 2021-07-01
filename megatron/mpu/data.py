@@ -20,7 +20,7 @@ from .initialize import get_tensor_model_parallel_rank
 from .initialize import get_tensor_model_parallel_src_rank
 
 
-_MAX_DATA_DIM = 4 # TODO for what?
+_MAX_DATA_DIM = 4 # TODO for what? dimension
 
 
 def _check_data_types(keys, data, target_dtype): # torch.int64
@@ -33,7 +33,7 @@ def _check_data_types(keys, data, target_dtype): # torch.int64
 def _build_key_size_numel_dictionaries(keys, data):
     """Build the size on rank 0 and broadcast."""
     max_dim = _MAX_DATA_DIM # 4
-    sizes = [0 for _ in range(max_dim) for _ in keys] # 4*5=20, all 0
+    sizes = [0 for _ in range(max_dim) for _ in keys] # 4*6=24, all 0
 
     # Pack the sizes on rank zero.
     if get_tensor_model_parallel_rank() == 0:
@@ -76,7 +76,7 @@ def _build_key_size_numel_dictionaries(keys, data):
 # total_numel: tensor(176)
 
 
-def broadcast_data(keys, data, datatype):
+def broadcast_data(keys, data, datatype): # a list of keys; data['text'].shape=[4, 512]
     """Broadcast data from rank zero of each model parallel group to the
     members of the same model parallel group.
 

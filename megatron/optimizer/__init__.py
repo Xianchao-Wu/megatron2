@@ -30,11 +30,12 @@ def _get_params_for_weight_decay_optimization(module):
     Layernorms and baises will have no weight decay but the rest will.
     """
     args = get_args()
-    LayerNorm = import_layernorm(args.fp32_residual_connection)
+    LayerNorm = import_layernorm(args.fp32_residual_connection) # apex.normalization.fused_layer_norm.FusedLayerNorm
     import pdb; pdb.set_trace()
-    weight_decay_params = {'params': []}
+    weight_decay_params = {'params': []} # weight_decay is alike L2-regularization, to make weight to be smaller! TODO
     no_weight_decay_params = {'params': [], 'weight_decay': 0.0}
-    for module_ in module.modules():
+    import pdb; pdb.set_trace()
+    for module_ in module.modules(): # TODO to check the details of weight decay!
         if isinstance(module_, LayerNorm):
             no_weight_decay_params['params'].extend(
                 [p for p in list(module_._parameters.values())
@@ -46,9 +47,9 @@ def _get_params_for_weight_decay_optimization(module):
             no_weight_decay_params['params'].extend(
                 [p for n, p in list(module_._parameters.items())
                  if p is not None and n == 'bias'])
-
+    import pdb; pdb.set_trace()
     return weight_decay_params, no_weight_decay_params
-
+    # 102 elements; 200 elements
 
 def get_megatron_optimizer(model):
     args = get_args()
@@ -57,9 +58,9 @@ def get_megatron_optimizer(model):
     param_groups = _get_params_for_weight_decay_optimization(model)
     optimizer = Adam(param_groups,
                      lr=args.lr,
-                     weight_decay=args.weight_decay,
-                     betas=(args.adam_beta1, args.adam_beta2),
-                     eps=args.adam_eps) # TODO [问题：只能是FusedAdam or Adam吗？]
+                     weight_decay=args.weight_decay, # 0.01, for L2-regularizaiton's lmabda coefficient
+                     betas=(args.adam_beta1, args.adam_beta2), # 0.9, 0.999
+                     eps=args.adam_eps) # 1e-08; TODO [问题：只能是FusedAdam or Adam吗？]
 
     if args.fp16: # for fp16 mixed-precision
         # Constant loss scale. [常数损失值比例/刻度]
@@ -67,13 +68,13 @@ def get_megatron_optimizer(model):
             grad_scaler = ConstantGradScaler(args.loss_scale)
         # Dynamic loss scale. [动态损失值比例/刻度]
         else:
-            grad_scaler = DynamicGradScaler(
-                initial_scale=args.initial_loss_scale,
+            grad_scaler = DynamicGradScaler( # here!
+                initial_scale=args.initial_loss_scale, # 4,294,967,296
                 min_scale=args.min_loss_scale,
                 growth_factor=2.0,
                 backoff_factor=0.5,
-                growth_interval=args.loss_scale_window,
-                hysteresis=args.hysteresis)
+                growth_interval=args.loss_scale_window, # 1000
+                hysteresis=args.hysteresis) # 2
         # Megatron optimizer.
         return FP16OptimizerWithFP16Params(optimizer, grad_scaler,
                                            args.clip_grad)

@@ -20,12 +20,12 @@ from abc import abstractmethod
 
 import torch
 
-
+# 梯度大小调节器
 class MegatronGradScaler(ABC):
 
     def __init__(self, initial_scale):
         """Initialize scale value with the input initial scale."""
-        assert initial_scale > 0.0
+        assert initial_scale > 0.0 # 4,294,967,296
         self._scale = torch.cuda.FloatTensor([initial_scale])
 
     @property
@@ -68,33 +68,33 @@ class ConstantGradScaler(MegatronGradScaler):
 class DynamicGradScaler(MegatronGradScaler):
     """dynamic gradient scaler"""
 
-    def __init__(self, initial_scale, min_scale,
-                 growth_factor, backoff_factor,
-                 growth_interval, hysteresis):
+    def __init__(self, initial_scale, min_scale, # 1=initial_scale=4.3Billion; 2=min_scale=1.0
+                 growth_factor, backoff_factor, # 3=growth_factor=2.0; 4=backoff_factor=0.5
+                 growth_interval, hysteresis): # 5=growth_interval=1000; 6=hysteresis=2
         """"Grad scaler with dynamic scale that gets adjusted
         during training."""
-        super(DynamicGradScaler, self).__init__(initial_scale)
+        super(DynamicGradScaler, self).__init__(initial_scale) # param.1
 
         # Lower bound on the scale.
-        assert min_scale > 0.0
+        assert min_scale > 0.0 # param.2
         assert min_scale <= initial_scale
         self.min_scale = torch.cuda.FloatTensor([min_scale])
 
         # Growth and backoff factors for the scale.
-        assert growth_factor > 1.0
+        assert growth_factor > 1.0 # param.3 生长因子
         self.growth_factor = torch.cuda.FloatTensor([growth_factor])
 
-        assert backoff_factor < 1.0
+        assert backoff_factor < 1.0 # param.4 后退因子
         assert backoff_factor > 0.0
         self.backoff_factor = torch.cuda.FloatTensor([backoff_factor])
 
         # Interval over which if we don't see any inf/nan,
         # we will scale the grad scale by the growth factor.
-        assert growth_interval > 0
+        assert growth_interval > 0 # param.5 增长区间
         self.growth_interval = growth_interval
         # Number of inf/nans we should see before scaling down
         # the grad scale by the backoff factor.
-        assert hysteresis > 0
+        assert hysteresis > 0 # 迟滞现象；滞后作用
         self.hysteresis = hysteresis
 
         # Trackers.
