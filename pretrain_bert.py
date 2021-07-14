@@ -92,7 +92,7 @@ def forward_step(data_iterator, model, input_tensor):
     """Forward step."""
     args = get_args()
     timers = get_timers()
-    import pdb; pdb.set_trace()
+    ### import pdb; pdb.set_trace()
     # Get the batch.
     timers('batch-generator').start()
     tokens, types, sentence_order, loss_mask, lm_labels, padding_mask \
@@ -115,22 +115,22 @@ def forward_step(data_iterator, model, input_tensor):
         output_tensor = model(input_tensor, padding_mask)
 
     if mpu.is_pipeline_last_stage():
-        lm_loss_, sop_logits = output_tensor
+        lm_loss_, sop_logits = output_tensor # masked-lm-loss.shape=[4, 512]; sop_logits=sentence order prediction's shape=[4, 2]
 
         sop_loss = F.cross_entropy(sop_logits.view(-1, 2).float(),
-                                   sentence_order.view(-1), # 1/0 as reference
+                                   sentence_order.view(-1), # 1/0 as reference, for sentence-order prediction
                                    ignore_index=-1)
         sop_loss = sop_loss.float()
 
         lm_loss_ = lm_loss_.float()
         loss_mask = loss_mask.float()
         lm_loss = torch.sum(
-            lm_loss_.view(-1) * loss_mask.reshape(-1)) / loss_mask.sum()
+            lm_loss_.view(-1) * loss_mask.reshape(-1)) / loss_mask.sum() # NOTE important! element-wise production
 
         loss = lm_loss + sop_loss # 如果基于loss来进行反向传播，那就是multi-task learning
 
         averaged_losses = average_losses_across_data_parallel_group([lm_loss, sop_loss])
-
+        # for 1-node, 1-gpu, the result is alike: loss=0.1236; averaged_losses=[0.1236, 2.3424e-05]
         return loss, {'lm loss': averaged_losses[0], 'sop loss': averaged_losses[1]}
     return output_tensor
 

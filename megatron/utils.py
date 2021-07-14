@@ -25,16 +25,16 @@ from megatron import get_adlr_autoresume
 from megatron import mpu
 from megatron.checkpointing import save_checkpoint
 
-
+# losses = [mlm.loss, sop.loss] where mlm=masked.language.model loss and sop=sentence.order.prediction
 def average_losses_across_data_parallel_group(losses):
-    """Reduce a tensor of losses across all GPUs."""
+    """Reduce a tensor of losses across all GPUs in one data parallel group."""
     averaged_losses = torch.cat(
         [loss.clone().detach().view(1) for loss in losses])
     torch.distributed.all_reduce(averaged_losses,
                                  group=mpu.get_data_parallel_group())
     averaged_losses = averaged_losses / \
         torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
-
+    # sum-up and then average over one data-parallel-group
     return averaged_losses
 
 

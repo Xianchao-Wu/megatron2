@@ -27,9 +27,10 @@ from megatron.model.utils import init_method_normal, scaled_init_method_normal
 
 def parallel_lm_logits(input_, word_embeddings_weight, parallel_output,
                        bias=None):
+    ### import pdb; pdb.set_trace() # TODO important for embedding's parallel!
     """LM logits using word embedding weights."""
     # Parallel logits.
-    input_parallel = mpu.copy_to_tensor_model_parallel_region(input_)
+    input_parallel = mpu.copy_to_tensor_model_parallel_region(input_) # embedding's logit parallel sharing! important!
     # Matrix multiply.
     if bias is None:
         logits_parallel = F.linear(input_parallel, word_embeddings_weight)
@@ -44,10 +45,10 @@ def parallel_lm_logits(input_, word_embeddings_weight, parallel_output,
         # TODO 问题，这个word_embeddings_weight和token的word_embeddings一样吗？
     else:
         logits_parallel = F.linear(input_parallel, word_embeddings_weight, bias)
-
+        # input_parallel=[4, 512, 1024]; word_embeddings_weight=[29056, 1024]; bias=[29056]
     # Gather if needed.
     if parallel_output: # do not gather (keep parallel)
-        return logits_parallel
+        return logits_parallel # [4, 512, 29056]
     # gather here:
     return mpu.gather_from_tensor_model_parallel_region(logits_parallel)
     # 输出的shape类似于：(batch.size, seq.len, vocab.size)
@@ -92,7 +93,7 @@ def get_language_model(attention_mask_func, num_tokentypes, add_pooler,
 class Pooler(MegatronModule):
     """Pooler layer.
 
-    Pool hidden states of a specific token (for example start of the
+    Pool hidden states of a specific token (for example, [CLS], i.e., start of the
     sequence) and add a linear transformation followed by a tanh.
 
     Arguments:
@@ -108,7 +109,7 @@ class Pooler(MegatronModule):
     def forward(self, hidden_states, sequence_index=0):
         # hidden_states: [b, s, h] where b=batch size, s=sequence len, h=hidden size
         # sequence_index: index of the token to pool.
-        pooled = hidden_states[:, sequence_index, :]
+        pooled = hidden_states[:, sequence_index, :] # [CLS]'s vector
         pooled = self.dense(pooled)
         pooled = torch.tanh(pooled)
         return pooled
@@ -190,8 +191,8 @@ class Embedding(MegatronModule):
         self.init_method(self.tokentype_embeddings.weight)
 
     def forward(self, input_ids, position_ids, tokentype_ids=None):
-        import pdb; pdb.set_trace() # Embeddings.
-        words_embeddings = self.word_embeddings(input_ids)
+        ### import pdb; pdb.set_trace() # Embeddings.
+        words_embeddings = self.word_embeddings(input_ids) # class Embedding
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = words_embeddings + position_embeddings
         if tokentype_ids is not None:
@@ -326,7 +327,7 @@ class TransformerLanguageModelBase(MegatronModule):
                 tokentype_ids=None, layer_past=None, get_key_value=False,
                 pooling_sequence_index=0):
 
-        import pdb; pdb.set_trace()
+        ### import pdb; pdb.set_trace()
         # Embeddings.
         if mpu.is_pipeline_first_stage():
             (input_ids, position_ids) = language_model_input
@@ -344,8 +345,8 @@ class TransformerLanguageModelBase(MegatronModule):
 
         if mpu.is_pipeline_last_stage() and self.add_pooler:
             pooled_output = self.pooler(transformer_output,
-                                        pooling_sequence_index)
-            return transformer_output, pooled_output
+                                        pooling_sequence_index) # for [CLS]
+            return transformer_output, pooled_output # [4, 512, 1024] and [4, 1024]
 
         return transformer_output
 
@@ -423,7 +424,7 @@ class TransformerLanguageModel(TransformerLanguageModelBase):
     def forward(self, input_ids, position_ids, attention_mask,
                 tokentype_ids=None, layer_past=None, get_key_value=False,
                 pooling_sequence_index=0):
-        import pdb; pdb.set_trace()
+        ###import pdb; pdb.set_trace()
         return super(TransformerLanguageModel, self).forward(
             (input_ids, position_ids),
             attention_mask,

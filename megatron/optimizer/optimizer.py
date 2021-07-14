@@ -96,7 +96,7 @@ class MegatronOptimizer(ABC):
 
     def scale_loss(self, loss):
         """Simple scaling."""
-        return self.get_loss_scale() * loss
+        return self.get_loss_scale() * loss # TODO how to obtain get_loss_scale()?
 
     @abstractmethod
     def step(self):
@@ -168,7 +168,7 @@ class FP16OptimizerWithFP16Params(MegatronOptimizer):
         self.fp16_groups = []
         self.fp32_from_fp16_groups = []
         self.fp32_from_fp32_groups = []
-        import pdb; pdb.set_trace()
+        ### import pdb; pdb.set_trace()
         # For all the groups in the original optimizer:
         for param_group in self.optimizer.param_groups:
             fp16_params_this_group = []

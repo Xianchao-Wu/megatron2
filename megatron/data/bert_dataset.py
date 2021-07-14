@@ -76,13 +76,13 @@ class BertDataset(Dataset):
         # 并从indexed_dataset中读取sample，然后构造sample
         #import pdb; pdb.set_trace() # TODO very important! build the sample of dataset!
         start_idx, end_idx, seq_length = self.samples_mapping[idx]
-        print_rank_0('__getitem__: idx={}, start_idx={}, end_idx={}, seq_length={}'.format(idx, start_idx, end_idx, seq_length))
+        #print_rank_0('__getitem__: idx={}, start_idx={}, end_idx={}, seq_length={}'.format(idx, start_idx, end_idx, seq_length))
         sample = [self.indexed_dataset[i] for i in range(start_idx, end_idx)]
-        totalseqlen = 0
-        for asample in sample:
-            print_rank_0('__getitem__: len(sample.shape)={}, sample[i].shape={}'.format(len(sample), asample.shape))
-            totalseqlen += asample.shape[0]
-        print_rank_0('__getitem__, total.seq.len={}'.format(totalseqlen))
+        #totalseqlen = 0
+        #for asample in sample:
+        #    print_rank_0('__getitem__: len(sample.shape)={}, sample[i].shape={}'.format(len(sample), asample.shape))
+        #    totalseqlen += asample.shape[0]
+        #print_rank_0('__getitem__, total.seq.len={}'.format(totalseqlen))
         # Note that this rng state should be numpy and not python since
         # python randint is inclusive whereas the numpy one is exclusive.
         np_rng = np.random.RandomState(seed=(self.seed + idx))
@@ -128,7 +128,7 @@ def get_samples_mapping_(indexed_dataset,
     # Build the indexed mapping if not exist.
     if torch.distributed.get_rank() == 0 and \
        not os.path.isfile(indexmap_filename):
-        import pdb; pdb.set_trace()
+        ###import pdb; pdb.set_trace()
         print(' > WARNING: could not find index map file {}, building '
               'the indices on rank 0 ...'.format(indexmap_filename))
 
@@ -212,11 +212,11 @@ def build_training_sample(sample,
     ###breakpoint()
     # step 0: (check) We assume that we have at least two sentences in the sample
     #print_rank_0('build_training_sample, len(sample)={}\nsample[0].shape={}'.format(len(sample), sample[0].shape))
-    totalseqlen = 0
-    for asample in sample:
-        print_rank_0('build_training_sample: len(sample.shape)={}, sample[i].shape={}'.format(len(sample), asample.shape))
-        totalseqlen += asample.shape[0]
-    print_rank_0('building_training_sample, total.seq.len={}'.format(totalseqlen))
+    #totalseqlen = 0
+    #for asample in sample:
+    #    print_rank_0('build_training_sample: len(sample.shape)={}, sample[i].shape={}'.format(len(sample), asample.shape))
+    #    totalseqlen += asample.shape[0]
+    #print_rank_0('building_training_sample, total.seq.len={}'.format(totalseqlen))
     assert len(sample) > 1
     assert target_seq_length <= max_seq_length
 

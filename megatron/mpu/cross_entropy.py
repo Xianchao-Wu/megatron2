@@ -43,7 +43,7 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
 
 
         # 最大值：Maximum value along vocab dimension across all GPUs.
-        logits_max = torch.max(vocab_parallel_logits, dim=-1)[0] # 自己gpu上的
+        logits_max = torch.max(vocab_parallel_logits, dim=-1)[0] # 自己gpu上的; take the max value of each length=29056 vector! e.g., from shape of [4, 512, 29056] to [4, 512]
         # (Pdb) p logits_max
         # tensor([[ 1.630737,  6.683737,  6.369127],
         #         [14.255266, 14.777843,  4.195274]], device='cuda:0')
@@ -54,7 +54,7 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
                                      group=get_tensor_model_parallel_group())
 
         # 都减去最大值，相对顺序不变：Subtract the maximum value.
-        vocab_parallel_logits.sub_(logits_max.unsqueeze(dim=-1))
+        vocab_parallel_logits.sub_(logits_max.unsqueeze(dim=-1)) # [4, 512, 29056]
         # tensor([[[ -2.747923,  -6.596638,     0.0000, -10.447615],
         #          [ -6.144735,     0.0000,  -7.280313, -11.358717],
         #          [    0.0000, -13.509927, -17.200371, -11.916370]],
@@ -68,14 +68,14 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
         get_vocab_range = VocabUtility.vocab_range_from_per_partition_vocab_size
 
         # 4
-        partition_vocab_size = vocab_parallel_logits.size()[-1]
+        partition_vocab_size = vocab_parallel_logits.size()[-1] # e.g., 29056 
 
         rank = get_tensor_model_parallel_rank()
         world_size = get_tensor_model_parallel_world_size()
         vocab_start_index, vocab_end_index = get_vocab_range(
             partition_vocab_size, rank, world_size)
 
-        # Create a mask of valid vocab ids (1 means it needs to be masked).
+        # Create a mask of valid vocab ids (1 means it needs to be masked). e.g., target.shape=[4, 512] for the reference target
         target_mask = (target < vocab_start_index) | (target >= vocab_end_index)
         # (Pdb) p target_mask
         # tensor([[False, False, False],
@@ -89,10 +89,10 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
         # Get predicted-logits = logits[target].
         # For Simplicity, we convert logits to a 2-D tensor with size
         # [*, partition-vocab-size] and target to a 1-D tensor of size [*].
-        logits_2d = vocab_parallel_logits.view(-1, partition_vocab_size) # torch.Size([221, 11])
+        logits_2d = vocab_parallel_logits.view(-1, partition_vocab_size) # torch.Size([221, 11]); also alike [4, 512, 29056] -> [2048, 29056]
         # same with vocab_parallel_logits currently (gpu=1)
 
-        masked_target_1d = masked_target.view(-1) # torch.Size([221])
+        masked_target_1d = masked_target.view(-1) # torch.Size([221]); reference target, e.g., from [4, 512] to [2048]
         # tensor([0, 0, 3, 0, 0, 0], device='cuda:0')
 
         arange_1d = torch.arange(start=0, end=logits_2d.size()[0],

@@ -267,13 +267,13 @@ def setup_model_and_optimizer(model_provider_func):
 
     model = get_model(model_provider_func)
 
-    import pdb; pdb.set_trace()
+    ### import pdb; pdb.set_trace()
 
     unwrapped_model = model # megatron.model.distributed.DistributedDataParallel
     while isinstance(unwrapped_model, (torchDDP, LocalDDP, FP16Module)): # e.g., is LocalDDP = megatron.model.distributed.DistributedDataParallel
         unwrapped_model = unwrapped_model.module
     optimizer = get_megatron_optimizer(unwrapped_model)
-    import pdb; pdb.set_trace()
+    ### import pdb; pdb.set_trace()
     lr_scheduler = get_learning_rate_scheduler(optimizer)
 
     if args.load is not None: # load existing checkpoint: '/workspace/megatron/ngc_models/release_bert_345m_uncased'
@@ -367,7 +367,7 @@ def backward_step(optimizer, model, input_tensor, output_tensor, output_tensor_g
 
     # Backward pass.
     if output_tensor_grad is None:
-        output_tensor = optimizer.scale_loss(output_tensor)
+        output_tensor = optimizer.scale_loss(output_tensor) # TODO for what?
     torch.autograd.backward(output_tensor, grad_tensors=output_tensor_grad)
 
     # Collect the grad of the input_tensor.
@@ -503,17 +503,19 @@ def forward_backward_no_pipelining(forward_step_func, data_iterator, model,
                                    optimizer, timers):
     """Run forward and backward passes without inter-stage communication."""
     args = get_args()
-    import pdb; pdb.set_trace()
+    ### import pdb; pdb.set_trace()
     losses_reduced = []
     for i in range(get_num_microbatches()):
         timers('forward-compute').start()
-        loss, loss_reduced = forward_step_func(data_iterator, model, input_tensor=None)
+        loss, loss_reduced = forward_step_func(data_iterator, model, input_tensor=None) # e.g., loss=0.1236; loss_reduced={'lm loss': tensor(0.1236, device='cuda:0'), 'sop loss': tensor(2.3424e-05, device='cuda:0')}
+
         output_tensor = loss / get_num_microbatches()
         losses_reduced.append(loss_reduced)
         timers('forward-compute').stop()
 
         timers('backward-compute').start()
         output_tensor_grad = None
+        ### import pdb; pdb.set_trace()
         backward_step(optimizer, model, input_tensor=None,
                       output_tensor=output_tensor, output_tensor_grad=None)
         timers('backward-compute').stop()
@@ -593,14 +595,14 @@ def train_step(forward_step_func, data_iterator,
         losses_reduced = forward_backward_pipelining(
             forward_step_func, data_iterator, model, optimizer, timers)
     else:
-        losses_reduced = forward_backward_no_pipelining(
+        losses_reduced = forward_backward_no_pipelining( # no pipeline model parallel?
             forward_step_func, data_iterator, model, optimizer, timers)
-
+    import pdb; pdb.set_trace()
     # All-reduce if needed.
-    if args.DDP_impl == 'local':
+    if args.DDP_impl == 'local': # after forward_backward_no_pipelining
         timers('backward-params-all-reduce').start()
         model.allreduce_params(reduce_after=False,
-                               fp32_allreduce=args.fp32_allreduce)
+                               fp32_allreduce=args.fp32_allreduce) # TODO why need this?
         timers('backward-params-all-reduce').stop()
 
     # All-reduce word_embeddings' grad across first and last stages to ensure
@@ -638,13 +640,13 @@ def train_step(forward_step_func, data_iterator,
     if mpu.is_pipeline_last_stage():
         # Average loss across microbatches.
         loss_reduced = {}
-        for key in losses_reduced[0]:
+        for key in losses_reduced[0]: # a list of 'lm loss' and 'sop loss'; where [0] is the lastest appended value
             losses_reduced_for_key = [x[key] for x in losses_reduced]
-            loss_reduced[key] = sum(losses_reduced_for_key) / len(losses_reduced_for_key)
+            loss_reduced[key] = sum(losses_reduced_for_key) / len(losses_reduced_for_key) # NOTE important, 8 batches' output averaged and the result is alike: 'lm loss':1.0459, 'sop loss':0.0233
         return loss_reduced, skipped_iter
     return {}, skipped_iter
 
-
+# loss_dict={'lm loss': tensor(1.0459, device='cuda:0'), 'sop loss': tensor(0.0233, device='cuda:0')}; total_loss_dict={'advanced iterations':0, 'skipped iterations':2, 'nan iterations': 0}, learning_rate=0.0, iteration=3, loss_scale=1073741824.0, report_memory_flag=True, skipped_iter=1
 def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
                  loss_scale, report_memory_flag, skipped_iter):
     """Log training information such as losses, timing, ...."""
@@ -790,7 +792,7 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
     # Write args to tensorboard
     write_args_to_tensorboard()
 
-    import pdb; pdb.set_trace()
+    ###import pdb; pdb.set_trace()
     # Turn on training mode which enables dropout.
     model.train() # just set to training mode!
 

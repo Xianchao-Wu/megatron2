@@ -56,13 +56,13 @@ class DistributedDataParallel(MegatronModule):
                 for tp in buckets:
                     bucket = buckets[tp]
                     grads = [param.grad.data for param in bucket]
-                    coalesced = _flatten_dense_tensors(grads) # 合并，联合成一个1d tensor
+                    coalesced = _flatten_dense_tensors(grads) # 合并，联合成一个1d tensor, e.g., -> bert torch.size([334,723,458]), 口额莱斯特 - 合并
                     if fp32_allreduce:
                         coalesced = coalesced.float()
                     if not no_scale and not reduce_after:
                         coalesced /= dist.get_world_size(group=self.data_parallel_group)
 
-                    dist.all_reduce(coalesced, group=self.data_parallel_group) # important TODO
+                    dist.all_reduce(coalesced, group=self.data_parallel_group) # important TODO dist=torch.distributed
 
                     torch.cuda.synchronize()
                     if not no_scale and reduce_after:

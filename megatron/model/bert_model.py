@@ -96,14 +96,15 @@ class BertLMHead(MegatronModule):
             self.gelu = erf_gelu
 
     def forward(self, hidden_states, word_embeddings_weight):
-        hidden_states = self.dense(hidden_states) # 一层线性层
-        hidden_states = self.gelu(hidden_states) # gelu，非线性激活函数
+        ### import pdb; pdb.set_trace()
+        hidden_states = self.dense(hidden_states) # BertLMHead's 一层线性层, 1024 -> 1024
+        hidden_states = self.gelu(hidden_states) # gelu，非线性激活函数, 
         hidden_states = self.layernorm(hidden_states) # 层normalization
         output = parallel_lm_logits(hidden_states,
                                     word_embeddings_weight,
                                     self.parallel_output,
                                     bias=self.bias)
-        return output
+        return output # [4, 512, 29056]
 
 
 def post_language_model_processing(lm_output, pooled_output,
@@ -113,14 +114,14 @@ def post_language_model_processing(lm_output, pooled_output,
                                    fp16_lm_cross_entropy):
     # Output.
     lm_logits = lm_head(
-        lm_output, logit_weights)
+        lm_output, logit_weights) # lm_output=[4, 512, 1024]; logit_weights=[29056, 1024] (embedding weights), which is alike self.word_embeddings_weight(); output's lm_logits' shape is [4, 512, 29056]
 
     binary_logits = None
     if binary_head is not None:
-        binary_logits = binary_head(pooled_output)
+        binary_logits = binary_head(pooled_output) # [4, 1024] -> [4, 2]
 
-    if lm_labels is None:
-        return lm_logits, binary_logits
+    if lm_labels is None: # "is None" means it is inference; "is not None" means it is training stage
+        return lm_logits, binary_logits # [4, 512, 29056]; [4, 2]
     else:
         if fp16_lm_cross_entropy:
             assert lm_logits.dtype == torch.half
@@ -128,7 +129,7 @@ def post_language_model_processing(lm_output, pooled_output,
         else:
             lm_loss = mpu.vocab_parallel_cross_entropy(lm_logits.float(),
                                                        lm_labels)
-        return lm_loss, binary_logits
+        return lm_loss, binary_logits # lm_loss.shape=[4, 512]; binary_logits.shape=[4, 2]
 
 
 class BertModelBase(MegatronModule):
@@ -141,7 +142,7 @@ class BertModelBase(MegatronModule):
 
         self.fp16_lm_cross_entropy = args.fp16_lm_cross_entropy
         self.add_binary_head = add_binary_head # True, TODO for what?
-        self.parallel_output = parallel_output # True, TODO for what?
+        self.parallel_output = parallel_output # True, TODO for what? control output layer near word embedding size
 
         init_method = init_method_normal(args.init_method_std) # return method handler, megatron/model/utils.py
         scaled_init_method = scaled_init_method_normal(args.init_method_std,
@@ -181,16 +182,16 @@ class BertModelBase(MegatronModule):
             args = [bert_model_input, extended_attention_mask]
         lm_output = self.language_model(*args, **kwargs)
         if mpu.is_pipeline_last_stage() and self.add_binary_head:
-            lm_output, pooled_output = lm_output
+            lm_output, pooled_output = lm_output # H=[4, 512, 1024]; [CLS]=[4, 1024]
         else:
             pooled_output = None
 
         if mpu.is_pipeline_last_stage():
-            return post_language_model_processing(lm_output, pooled_output,
-                                                  self.lm_head, self.binary_head,
-                                                  lm_labels,
-                                                  self.word_embeddings_weight(),
-                                                  self.fp16_lm_cross_entropy)
+            return post_language_model_processing(lm_output, pooled_output, # [4, 512, 1024]; [4, 1024]
+                    self.lm_head, self.binary_head, # self.lm_head: megatron.model.bert_model.BertLMHead object (linear of 1024 to 1024 and then layernorm); self.binary_head = torch.nn.modules.linear.Linear (1024 to 2) 
+                                                  lm_labels, # [4, 512] with -1 for not masked tokens, ids such as 7058 for token ID of masked sub-words (tokens)
+                                                  self.word_embeddings_weight(), # [29056, 1024]
+                                                  self.fp16_lm_cross_entropy) # False
         else:
             return lm_output
 
@@ -245,7 +246,7 @@ class BertModel(BertModelBase):
 
     def forward(self, input_ids, attention_mask,
                 tokentype_ids=None, lm_labels=None):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return super(BertModel, self).forward(
             input_ids,
             attention_mask,

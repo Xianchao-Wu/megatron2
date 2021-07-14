@@ -79,7 +79,7 @@ class MegatronModule(torch.nn.Module):
         # 3. In the training loop, before an all-reduce between the grads of
         #    the two word_embeddings layers to ensure that every applied weight
         #    update is the same on both stages.
-        import pdb; pdb.set_trace()
+        ### import pdb; pdb.set_trace()
         if mpu.is_pipeline_last_stage():
             if not mpu.is_pipeline_first_stage():
                 self._word_embeddings_for_head_key = 'word_embeddings_for_head'
@@ -96,8 +96,8 @@ class MegatronModule(torch.nn.Module):
         # TODO 背后的考量是什么？
         # 已知的是：first_stage()和last_stage()构成了当前进程所在的 embedding group!
 
-        if torch.distributed.get_rank() == 0:
-            import pdb; pdb.set_trace()
+        ###if torch.distributed.get_rank() == 0:
+        ###    import pdb; pdb.set_trace()
         if mpu.is_pipeline_first_stage() or mpu.is_pipeline_last_stage(): # TODO important for, first stage and last stage -> all_reduce!
             torch.distributed.all_reduce(self.word_embeddings_weight().data,
                                          group=mpu.get_embedding_group())
@@ -156,7 +156,7 @@ class FP16Module(MegatronModule):
     def forward(self, *inputs, **kwargs):
         if mpu.is_pipeline_first_stage():
             inputs = fp32_to_fp16(inputs)
-        outputs = self.module(*inputs, **kwargs)
+        outputs = self.module(*inputs, **kwargs) # loss.shape=[4, 512] and binary.head.shape=[4,2]
         if mpu.is_pipeline_last_stage():
             outputs = fp16_to_fp32(outputs)
         return outputs
