@@ -91,6 +91,7 @@ class Encoder(object):
     #        return Encoder.splitter.tokenize(text)
 
     def encode(self, json_line): # 该方法负责把一行输入的json格式的document(text)分别进行“句子切割”和“word to id"的变换：
+        #import ipdb; ipdb.set_trace()
         data = json.loads(json_line)
         ids = {}
         for key in self.args.json_keys:
@@ -144,6 +145,9 @@ def get_args():
                        choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceJp',
                                 'GPT2BPETokenizer', 'GPT2BPETokenizerJp', 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
+    group.add_argument('--lowercase', action='store_true',
+                       help='is perform lowercase or not, default=keep case sensitive')     
+
     group.add_argument('--vocab-file', type=str, 
                        default=vocabfn,
                        help='Path to the vocab file')
@@ -223,7 +227,8 @@ def main():
     proc_start = time.time()
     total_bytes_processed = 0
     print("Time cost to startup:", startup_end - startup_start)
-
+    
+    #import ipdb; ipdb.set_trace()
     for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
         total_bytes_processed += bytes_processed
         for key, sentences in doc.items(): # sentences = [[15457, 1166, 1103, 16688, 3676]] -> jumps over the lazy dog
@@ -252,7 +257,8 @@ def main():
     print("Processed {} documents".format(i),
         "({:.4f} docs/s, {:.4f} MB/s).".format(i/elapsed, mbs),
         file=sys.stderr)
-
+    
+    import ipdb; ipdb.set_trace()
     for key in args.json_keys: # ['text']
         builders[key].finalize(output_idx_files[key])
 

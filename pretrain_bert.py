@@ -92,7 +92,7 @@ def forward_step(data_iterator, model, input_tensor):
     """Forward step."""
     args = get_args()
     timers = get_timers()
-    ### import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     # Get the batch.
     timers('batch-generator').start()
     tokens, types, sentence_order, loss_mask, lm_labels, padding_mask \

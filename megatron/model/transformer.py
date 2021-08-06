@@ -94,7 +94,7 @@ class ParallelMLP(MegatronModule):
          
 
     def forward(self, hidden_states):
-        ###import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         # [s, b, 4hp] (序列长度，批大小，4*一个划分上的隐层维度hp)? TODO-okay
         # 这里应该是一个整体的隐层维度大小（所有gpu的整体）[s, b, 4*h] -> NO, is [s, b, 4h/p] for one gpu!
         intermediate_parallel, bias_parallel = self.dense_h_to_4h(hidden_states)
@@ -219,7 +219,7 @@ class ParallelSelfAttention(MegatronModule):
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         # hidden_states: [sq, b, h]
 
         # =====================
@@ -457,7 +457,7 @@ class ParallelTransformerLayer(MegatronModule):
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
 
         # hidden_states: [b, s, h]
         # x -> [self.layernorm] -> x1 -> self.attention -> x2 -> bias_dropout_add_residual -> x3 -> self.mlp -> x4
@@ -555,7 +555,7 @@ class ParallelTransformer(MegatronModule):
                 output_layer_init_method, layer_number)
         offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers # now self.num_layers= number of layers in current GPU! rank() is the rank of current gpu in current pipeline parallel group! NOTE
         # NOTE import here:
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         self.layers = torch.nn.ModuleList(
             [build_layer(i + 1 + offset) for i in range(self.num_layers)]) # 自己gpu的一共的层数=self.num_layers!
 
@@ -593,7 +593,7 @@ class ParallelTransformer(MegatronModule):
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         # Checks.
         if layer_past is not None: # ParallelTransformer's forward
             assert get_key_value, \
@@ -628,7 +628,7 @@ class ParallelTransformer(MegatronModule):
                 past = None
                 if layer_past is not None:
                     past = layer_past[index]
-                ### import pdb; pdb.set_trace()
+                import pdb; pdb.set_trace()
                 ### 调用ParallelTransformerLayer的forward函数：###
                 hidden_states = layer(hidden_states,
                                       attention_mask,
@@ -639,7 +639,7 @@ class ParallelTransformer(MegatronModule):
                     presents.append(present)
         
         # Final layer norm.
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         if mpu.is_pipeline_last_stage(): # NOTE important here! since this is after 24-layer transformer-encoder layers! 
             # 即当前gpu的rank = world_size - 1! 也就是说当前的gpu是"gpu并行群组"的最后一个
             # defined in megatron/mpu/initialize.py

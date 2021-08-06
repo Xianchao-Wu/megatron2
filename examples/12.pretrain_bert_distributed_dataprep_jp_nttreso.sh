@@ -12,11 +12,20 @@
 #prefix="fsi-en-bert-8files-bert-large-cased-vocab-bwplc"
 
 # TODO actually 8files are actually 12 files: mainichi, nikkei, and sankei
-jsonfile="/workspace/megatron/datasets/japanese-fsi/jp.fsi.8files.json"
-vocabfile="/workspace/megatron/datasets/japanese-fsi/jp.fsi.8files.txt.vocab"
-prefix="fsi-ja-bert-12files-bert-large-vocab-bwplc-debugonly"
+#jsonfile="/workspace/megatron/datasets/japanese-fsi/jp.fsi.8files.json"
+#vocabfile="/workspace/megatron/datasets/japanese-fsi/jp.fsi.8files.txt.vocab"
+#prefix="fsi-ja-bert-12files-bert-large-vocab-bwplc-debugonly"
 
-python -m ipdb tools/preprocess_data.py \
+adir="/workspace/megatron/datasets/nttreso_qa/export/"
+jsonfile=$adir"/export_readable_20210727_simp_2read_v2.json"
+
+vocabfile=$adir"/export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe"
+
+prefix="nttreso-ja-bert-vocab-32k-mecab-bpe-case"
+
+# mecab+ipa -> bpe/wordpiece
+
+python tools/preprocess_data.py \
 	       --input $jsonfile \
 	       --output-prefix $prefix \
 	       --vocab $vocabfile \

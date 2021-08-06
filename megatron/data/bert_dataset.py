@@ -74,7 +74,7 @@ class BertDataset(Dataset):
     def __getitem__(self, idx):
         # 根据idx，读取self.samples_mapping里面的索引信息，
         # 并从indexed_dataset中读取sample，然后构造sample
-        #import pdb; pdb.set_trace() # TODO very important! build the sample of dataset!
+        import pdb; pdb.set_trace() # TODO very important! build the sample of dataset!
         start_idx, end_idx, seq_length = self.samples_mapping[idx]
         #print_rank_0('__getitem__: idx={}, start_idx={}, end_idx={}, seq_length={}'.format(idx, start_idx, end_idx, seq_length))
         sample = [self.indexed_dataset[i] for i in range(start_idx, end_idx)]
@@ -128,7 +128,7 @@ def get_samples_mapping_(indexed_dataset,
     # Build the indexed mapping if not exist.
     if torch.distributed.get_rank() == 0 and \
        not os.path.isfile(indexmap_filename):
-        ###import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         print(' > WARNING: could not find index map file {}, building '
               'the indices on rank 0 ...'.format(indexmap_filename))
 
@@ -208,7 +208,7 @@ def build_training_sample(sample,
               应该是来自numpy的，上界开；
               如果是来自python自己的话，是上界闭。
     """
-    #import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     ###breakpoint()
     # step 0: (check) We assume that we have at least two sentences in the sample
     #print_rank_0('build_training_sample, len(sample)={}\nsample[0].shape={}'.format(len(sample), sample[0].shape))
@@ -264,6 +264,6 @@ def build_training_sample(sample,
         'padding_mask': padding_mask_np,
         'truncated': int(truncated)} # 1代表sequence被截取了；0代表没有被截取
     ###breakpoint()
-    #import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     return train_sample
 

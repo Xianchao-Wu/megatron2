@@ -127,7 +127,7 @@ def load_vocab(vocab_file):
         while True:
             token = convert_to_unicode(reader.readline())
             if not token:
-                break # TODO why break? should be 'continue'?
+                break # TODO why break? should be 'continue'? -> break is okay since it is the end of the file
             token = token.strip()
             vocab[token] = index
             index += 1

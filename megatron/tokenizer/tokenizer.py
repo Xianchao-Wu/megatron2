@@ -39,9 +39,8 @@ def build_tokenizer(args):
     elif args.tokenizer_type == 'BertWordPieceCase':
         tokenizer = _BertWordPieceTokenizer(vocab_file=args.vocab_file,
                                             lower_case=False)
-    elif args.tokenizer_type == "BertWordPieceJp": # no need to separate "case" and "lowercase" for Jp
-        tokenizer = _BertWordPieceTokenizerJp(vocab_file=args.vocab_file,
-                                              mecab_dict_path=args.mecab_dict_path)
+    elif args.tokenizer_type == "BertWordPieceJp": # no need to separate "case" and "lowercase" for Jp -> NEED separate!!! NOTE
+        tokenizer = _BertWordPieceTokenizerJp(vocab_file=args.vocab_file, lower_case=args.lowercase, mecab_dict_path=args.mecab_dict_path)
     elif args.tokenizer_type == 'GPT2BPETokenizer':
         assert args.merge_file is not None # for english only, byte level bpe tokenizer is not fittable for japanese/chinese
         tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
@@ -207,7 +206,7 @@ class _BertWordPieceTokenizerJp(AbstractTokenizer):
         if lower_case: # True by default
             name = 'BERT Japanese Lower Case'
         else:
-            name = 'BERT Japanese Upper Case'
+            name = 'BERT Japanese Upper Case Sensitive (i.e., keep original cases)'
         super().__init__(name)
         self.tokenizer = FullBertTokenizerJp(vocab_file, do_lower_case=lower_case, mecab_dict_path=mecab_dict_path)
         self.cls_id = self.tokenizer.vocab['[CLS]'] # 101

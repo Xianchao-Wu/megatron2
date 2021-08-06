@@ -27,7 +27,7 @@ from megatron.model.utils import init_method_normal, scaled_init_method_normal
 
 def parallel_lm_logits(input_, word_embeddings_weight, parallel_output,
                        bias=None):
-    ### import pdb; pdb.set_trace() # TODO important for embedding's parallel!
+    import pdb; pdb.set_trace() # TODO important for embedding's parallel!
     """LM logits using word embedding weights."""
     # Parallel logits.
     input_parallel = mpu.copy_to_tensor_model_parallel_region(input_) # embedding's logit parallel sharing! important!
@@ -191,7 +191,7 @@ class Embedding(MegatronModule):
         self.init_method(self.tokentype_embeddings.weight)
 
     def forward(self, input_ids, position_ids, tokentype_ids=None):
-        ### import pdb; pdb.set_trace() # Embeddings.
+        import pdb; pdb.set_trace() # Embeddings.
         words_embeddings = self.word_embeddings(input_ids) # class Embedding
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = words_embeddings + position_embeddings
@@ -327,7 +327,7 @@ class TransformerLanguageModelBase(MegatronModule):
                 tokentype_ids=None, layer_past=None, get_key_value=False,
                 pooling_sequence_index=0):
 
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         # Embeddings.
         if mpu.is_pipeline_first_stage():
             (input_ids, position_ids) = language_model_input
@@ -424,7 +424,7 @@ class TransformerLanguageModel(TransformerLanguageModelBase):
     def forward(self, input_ids, position_ids, attention_mask,
                 tokentype_ids=None, layer_past=None, get_key_value=False,
                 pooling_sequence_index=0):
-        ###import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         return super(TransformerLanguageModel, self).forward(
             (input_ids, position_ids),
             attention_mask,

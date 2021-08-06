@@ -568,6 +568,8 @@ def _add_data_args(parser):
                                 'GPT2BPETokenizerJp',
                                 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
+    group.add_argument('--lowercase', action='store_true', 
+                       help='is perform lowercase or not, default=keep case sensitive')
     group.add_argument('--data-impl', type=str, default='mmap', #'infer',
                        choices=['lazy', 'cached', 'mmap', 'infer'],
                        help='Implementation of indexed datasets.')

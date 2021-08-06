@@ -18,8 +18,8 @@ WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 #DATA_PATH=<Specify path and file prefix>_text_sentence
 DATA_PATH=/workspace/megatron/megatron2/bin.idx.files/fsi-en-bert-8files-bert-large-cased-vocab-bwplc-small_text_sentence
 #CHECKPOINT_PATH=<Specify path>
-CHECKPOINT_PATH_IN=/workspace/megatron/ngc_models/release_bert_345m_uncased
-CHECKPOINT_PATH_OUT=/workspace/megatron/ngc_models/release_bert_345m_uncased_small
+CHECKPOINT_PATH_IN=/workspace/megatron/ngc_models/release_bert_345m_cased
+CHECKPOINT_PATH_OUT=/workspace/megatron/ngc_models/release_bert_345m_cased_small
 
 vocabfn=/workspace/megatron/ngc_models/bert-large-cased-vocab.txt
 

@@ -267,13 +267,13 @@ def setup_model_and_optimizer(model_provider_func):
 
     model = get_model(model_provider_func)
 
-    ### import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
 
     unwrapped_model = model # megatron.model.distributed.DistributedDataParallel
     while isinstance(unwrapped_model, (torchDDP, LocalDDP, FP16Module)): # e.g., is LocalDDP = megatron.model.distributed.DistributedDataParallel
         unwrapped_model = unwrapped_model.module
     optimizer = get_megatron_optimizer(unwrapped_model)
-    ### import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     lr_scheduler = get_learning_rate_scheduler(optimizer)
 
     if args.load is not None: # load existing checkpoint: '/workspace/megatron/ngc_models/release_bert_345m_uncased'
@@ -503,7 +503,7 @@ def forward_backward_no_pipelining(forward_step_func, data_iterator, model,
                                    optimizer, timers):
     """Run forward and backward passes without inter-stage communication."""
     args = get_args()
-    ### import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     losses_reduced = []
     for i in range(get_num_microbatches()):
         timers('forward-compute').start()
@@ -515,7 +515,7 @@ def forward_backward_no_pipelining(forward_step_func, data_iterator, model,
 
         timers('backward-compute').start()
         output_tensor_grad = None
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         backward_step(optimizer, model, input_tensor=None,
                       output_tensor=output_tensor, output_tensor_grad=None)
         timers('backward-compute').stop()
@@ -792,7 +792,7 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
     # Write args to tensorboard
     write_args_to_tensorboard()
 
-    ###import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     # Turn on training mode which enables dropout.
     model.train() # just set to training mode!
 

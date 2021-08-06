@@ -13,10 +13,11 @@ jsonfile="/workspace/megatron/datasets/english-fsi/eight.files3.json"
 vocabfile="/workspace/megatron/ngc_models/bert-large-cased-vocab.txt"
 prefix="fsi-en-bert-8files-bert-large-cased-vocab-bwplc-small3"
 
-python tools/preprocess_data.py \
+python -m ipdb tools/preprocess_data.py \
 	       --input $jsonfile \
 	       --output-prefix $prefix \
 	       --vocab $vocabfile \
 	       --dataset-impl mmap \
-	       --tokenizer-type BertWordPieceLowerCase #\
+	       --tokenizer-type BertWordPieceCase #\
+	       #--tokenizer-type BertWordPieceLowerCase #\
 	       #--split-sentences # TODO no need anymore, default is perform split sent

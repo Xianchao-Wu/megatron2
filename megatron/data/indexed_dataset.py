@@ -408,14 +408,16 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                     self._file.write(struct.pack('<Q', len(sizes))) # 6, 写到index文件; part 4, 所有文档的句子的总和
                     self._file.write(struct.pack('<Q', len(doc_idx))) # 2; part 5, 文档的数量=doc_idx-1
 
+                    import ipdb; ipdb.set_trace()
                     sizes = np.array(sizes, dtype=np.int32)
                     self._file.write(sizes.tobytes(order='C')) # part 6, 每个句子中word piece (token)的数量
                     del sizes
-
+                    import ipdb; ipdb.set_trace()
                     pointers = np.array(pointers, dtype=np.int64) # pointers = [0, 60, 168, 200, 260, 314]
                     self._file.write(pointers.tobytes(order='C')) # part 7, 句子的pointers
                     del pointers
 
+                    import ipdb; ipdb.set_trace()
                     doc_idx = np.array(doc_idx, dtype=np.int64) # doc_idx = [0, 6]
                     self._file.write(doc_idx.tobytes(order='C')) # part 8, 每个document的起始位置?
 
@@ -650,8 +652,8 @@ class MMapIndexedDatasetBuilder(object): # MMap = memory map indexed data file (
         # idx part 4: 8 bytes, len(sizes)=总体的句子的个数 (doc1's num1 + doc2's num2 + ... + docn's numn) -> 这个需要两个idx的part 4相加
         # idx part 5: 8 bytes, len(doc_idx)=总体的文档的个数+1 -> 这个需要两个idx的part 5 相加之后-1 = total doc's num + 1
         # idx part 6: 写sizes，即每个句子的长度(word piece的个数)，这个两个idx的这个部分直接叠加就好了
-        # idx part 7: 写pointers，这个的话，第二个idx文件的所有pointers都需要重新计算的！然后追加到第一个idx的最后边就可以了；
-        # idx part 8: 写_doc_idx，这个也是需要修改第二个idx文件的所有_doc_idx，然后追加到第一个idx的最后边就可以了。
+        # idx part 7: 写pointers，这个的话，第二个idx文件的所有pointers都需要重新计算的！然后追加到第一个idx的最后边就可以了；-> 具体为，pointers2每个元素+= sum(sizes1) * pointers1[1]/sizes1[0]
+        # idx part 8: 写_doc_idx，这个也是需要修改第二个idx文件的所有_doc_idx，然后追加到第一个idx的最后边就可以了。-> 具体为，_doc_idx2的第0号元素0被删除，剩余每个元素都+= doc_idx1[-1]; 更多细节参考知乎：https://zhuanlan.zhihu.com/p/388830967/
 
     def finalize(self, index_file): # e.g., index_file = 'my-gpt2-ja-debug_text_sentence.idx'
         self._data_file.close()

@@ -96,7 +96,7 @@ class BertLMHead(MegatronModule):
             self.gelu = erf_gelu
 
     def forward(self, hidden_states, word_embeddings_weight):
-        ### import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         hidden_states = self.dense(hidden_states) # BertLMHead's 一层线性层, 1024 -> 1024
         hidden_states = self.gelu(hidden_states) # gelu，非线性激活函数, 
         hidden_states = self.layernorm(hidden_states) # 层normalization
@@ -246,7 +246,7 @@ class BertModel(BertModelBase):
 
     def forward(self, input_ids, attention_mask,
                 tokentype_ids=None, lm_labels=None):
-        #import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         return super(BertModel, self).forward(
             input_ids,
             attention_mask,
