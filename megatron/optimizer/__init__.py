@@ -31,10 +31,10 @@ def _get_params_for_weight_decay_optimization(module):
     """
     args = get_args()
     LayerNorm = import_layernorm(args.fp32_residual_connection) # apex.normalization.fused_layer_norm.FusedLayerNorm
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     weight_decay_params = {'params': []} # weight_decay is alike L2-regularization, to make weight to be smaller! TODO
     no_weight_decay_params = {'params': [], 'weight_decay': 0.0}
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     for module_ in module.modules(): # TODO to check the details of weight decay!
         if isinstance(module_, LayerNorm):
             no_weight_decay_params['params'].extend(
@@ -47,7 +47,7 @@ def _get_params_for_weight_decay_optimization(module):
             no_weight_decay_params['params'].extend(
                 [p for n, p in list(module_._parameters.items())
                  if p is not None and n == 'bias'])
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     return weight_decay_params, no_weight_decay_params
     # 102 elements; 200 elements
 

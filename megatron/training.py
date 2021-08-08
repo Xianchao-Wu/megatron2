@@ -109,7 +109,7 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     timers('model and optimizer').stop()
     print_datetime('after model, optimizer, and learning rate '
                    'scheduler are built')
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     # Data stuff.
     timers('train/valid/test data iterators').start()
     train_data_iterator, valid_data_iterator, test_data_iterator \
@@ -122,14 +122,14 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     print_rank_0('done with setups ...')
     timers.log(['model and optimizer', 'train/valid/test data iterators'])
     print_rank_0('training ...')
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     iteration = 0
     if args.do_train and args.train_iters > 0:
         iteration = train(forward_step_func,
                           model, optimizer, lr_scheduler,
                           train_data_iterator, valid_data_iterator)
     print_datetime('after training is done')
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     if args.do_valid:
         prefix = 'the end of training for val data'
         evaluate_and_print_results(prefix, forward_step_func,
@@ -267,13 +267,13 @@ def setup_model_and_optimizer(model_provider_func):
 
     model = get_model(model_provider_func)
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     unwrapped_model = model # megatron.model.distributed.DistributedDataParallel
     while isinstance(unwrapped_model, (torchDDP, LocalDDP, FP16Module)): # e.g., is LocalDDP = megatron.model.distributed.DistributedDataParallel
         unwrapped_model = unwrapped_model.module
     optimizer = get_megatron_optimizer(unwrapped_model)
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     lr_scheduler = get_learning_rate_scheduler(optimizer)
 
     if args.load is not None: # load existing checkpoint: '/workspace/megatron/ngc_models/release_bert_345m_uncased'
@@ -282,7 +282,7 @@ def setup_model_and_optimizer(model_provider_func):
         # max time.
         torch.distributed.barrier()
         timers('load checkpoint').start()
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         args.iteration = load_checkpoint(model, optimizer, lr_scheduler) # model=megatron.model.distributed.DistributedDataParallel; optimizer=megatron.optimizer.optimizer.FP16OptimizerWithFP16Params; lr_scheduler=megatron.learning_rates.AnnealingLR
         torch.distributed.barrier()
         timers('load checkpoint').stop()
@@ -503,7 +503,7 @@ def forward_backward_no_pipelining(forward_step_func, data_iterator, model,
                                    optimizer, timers):
     """Run forward and backward passes without inter-stage communication."""
     args = get_args()
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     losses_reduced = []
     for i in range(get_num_microbatches()):
         timers('forward-compute').start()
@@ -515,7 +515,7 @@ def forward_backward_no_pipelining(forward_step_func, data_iterator, model,
 
         timers('backward-compute').start()
         output_tensor_grad = None
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         backward_step(optimizer, model, input_tensor=None,
                       output_tensor=output_tensor, output_tensor_grad=None)
         timers('backward-compute').stop()
@@ -597,7 +597,7 @@ def train_step(forward_step_func, data_iterator,
     else:
         losses_reduced = forward_backward_no_pipelining( # no pipeline model parallel?
             forward_step_func, data_iterator, model, optimizer, timers)
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     # All-reduce if needed.
     if args.DDP_impl == 'local': # after forward_backward_no_pipelining
         timers('backward-params-all-reduce').start()
@@ -792,7 +792,7 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
     # Write args to tensorboard
     write_args_to_tensorboard()
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     # Turn on training mode which enables dropout.
     model.train() # just set to training mode!
 

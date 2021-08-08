@@ -96,7 +96,7 @@ class BertLMHead(MegatronModule):
             self.gelu = erf_gelu
 
     def forward(self, hidden_states, word_embeddings_weight):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         hidden_states = self.dense(hidden_states) # BertLMHead's 一层线性层, 1024 -> 1024
         hidden_states = self.gelu(hidden_states) # gelu，非线性激活函数, 
         hidden_states = self.layernorm(hidden_states) # 层normalization
@@ -246,7 +246,7 @@ class BertModel(BertModelBase):
 
     def forward(self, input_ids, attention_mask,
                 tokentype_ids=None, lm_labels=None):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return super(BertModel, self).forward(
             input_ids,
             attention_mask,
@@ -262,7 +262,7 @@ class BertModelFirstStage(BertModelBase):
 
     def forward(self, input_ids, attention_mask,
                 tokentype_ids=None):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return super(BertModelFirstStage, self).forward(
             input_ids,
             attention_mask,
@@ -276,7 +276,7 @@ class BertModelIntermediateStage(BertModelBase):
             num_tokentypes=num_tokentypes)
 
     def forward(self, hidden_state, attention_mask):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return super(BertModelIntermediateStage, self).forward(
             hidden_state,
             attention_mask)
@@ -293,7 +293,7 @@ class BertModelLastStage(BertModelBase):
 
     def forward(self, hidden_state, attention_mask,
                 lm_labels=None):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return super(BertModelLastStage, self).forward(
             hidden_state,
             attention_mask,

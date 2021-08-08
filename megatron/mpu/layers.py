@@ -186,7 +186,7 @@ class VocabParallelEmbedding(torch.nn.Module):
                                           partition_dim=0, stride=1)
 
     def forward(self, input_):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         # input_ 取值和单词在词表中的绝对序号有关系
         if self.tensor_model_parallel_size > 1: # 当前并行群组中gpu的数量
             # Build the mask.
@@ -304,7 +304,7 @@ class ColumnParallelLinear(torch.nn.Module):
 
 
     def forward(self, input_):
-        import pdb; pdb.set_trace() # column parallel linear
+        #import pdb; pdb.set_trace() # column parallel linear
         # Set up backprop all-reduce. 输入的是整体h，输出的是4h/p被按照gpu分割之后的！
         # “forward复制-backward全归约” - 纵刀流的f (column parallel linear layer)
         input_parallel = copy_to_tensor_model_parallel_region(input_) 
@@ -419,7 +419,7 @@ class RowParallelLinear(torch.nn.Module):
 
 
     def forward(self, input_):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         # Set up backprop all-reduce. 输入的tensor是被分割到每个gpu的，输出的tensor是整体all-reduce之后的！
         if self.input_is_parallel: # Transformer's MLP使用这个部分:
             input_parallel = input_

@@ -89,7 +89,7 @@ def make_dataset(path, impl, skip_warmup=False):
     elif impl == 'cached' and IndexedDataset.exists(path):
         return IndexedCachedDataset(path)
     elif impl == 'mmap' and MMapIndexedDataset.exists(path):
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         return MMapIndexedDataset(path, skip_warmup)
     print(f"Unknown dataset implementation: {impl}")
     return None
@@ -408,16 +408,16 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                     self._file.write(struct.pack('<Q', len(sizes))) # 6, 写到index文件; part 4, 所有文档的句子的总和
                     self._file.write(struct.pack('<Q', len(doc_idx))) # 2; part 5, 文档的数量=doc_idx-1
 
-                    import ipdb; ipdb.set_trace()
+                    #import ipdb; ipdb.set_trace()
                     sizes = np.array(sizes, dtype=np.int32)
                     self._file.write(sizes.tobytes(order='C')) # part 6, 每个句子中word piece (token)的数量
                     del sizes
-                    import ipdb; ipdb.set_trace()
+                    #import ipdb; ipdb.set_trace()
                     pointers = np.array(pointers, dtype=np.int64) # pointers = [0, 60, 168, 200, 260, 314]
                     self._file.write(pointers.tobytes(order='C')) # part 7, 句子的pointers
                     del pointers
 
-                    import ipdb; ipdb.set_trace()
+                    #import ipdb; ipdb.set_trace()
                     doc_idx = np.array(doc_idx, dtype=np.int64) # doc_idx = [0, 6]
                     self._file.write(doc_idx.tobytes(order='C')) # part 8, 每个document的起始位置?
 

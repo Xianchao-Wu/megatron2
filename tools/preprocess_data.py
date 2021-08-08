@@ -200,7 +200,7 @@ def main():
     encoder = Encoder(args)
     tokenizer = build_tokenizer(args) # TODO why need this? 可以直接用encoder.tokenizer
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer) # TODO，构建一个Pool对象，进程池
-    encoded_docs = pool.imap(encoder.encode, fin, 25) # TODO what is "25"? = chunksize, 这里的fin是一个iterable的对象(文件句柄)
+    encoded_docs = pool.imap(encoder.encode, fin, 64) # TODO what is "25"? = chunksize, 这里的fin是一个iterable的对象(文件句柄)
     # fin按块25（类似于25行一个线程）执行encoder.encode (即把文字列转换为id).
     #encoded_docs = map(encoder.encode, fin)
 
@@ -258,7 +258,7 @@ def main():
         "({:.4f} docs/s, {:.4f} MB/s).".format(i/elapsed, mbs),
         file=sys.stderr)
     
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
     for key in args.json_keys: # ['text']
         builders[key].finalize(output_idx_files[key])
 

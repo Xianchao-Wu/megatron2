@@ -92,7 +92,7 @@ def forward_step(data_iterator, model, input_tensor):
     """Forward step."""
     args = get_args()
     timers = get_timers()
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     # Get the batch.
     timers('batch-generator').start()
     tokens, types, sentence_order, loss_mask, lm_labels, padding_mask \
@@ -162,6 +162,6 @@ if __name__ == "__main__":
     # 2. model_provider: 一个函数，建立model
     # 3. forward_step: 一个函数
     # 4. args_defaults: 这里只是指定bert tokenizer的类型
-    import pdb; pdb.set_trace() # start debugging from here:
+    #import pdb; pdb.set_trace() # start debugging from here:
     pretrain(train_valid_test_datasets_provider, model_provider, forward_step,
              args_defaults={'tokenizer_type': 'BertWordPieceLowerCase'})
