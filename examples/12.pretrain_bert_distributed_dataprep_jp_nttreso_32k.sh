@@ -30,6 +30,7 @@ python tools/preprocess_data.py \
 	       --output-prefix $prefix \
 	       --vocab $vocabfile \
 	       --dataset-impl mmap \
-	       --tokenizer-type BertWordPieceJp #\
+	       --tokenizer-type BertWordPieceCaseJp #\
+	       #--tokenizer-type BertWordPieceJp #\
 	       #--tokenizer-type BertWordPieceLowerCase #\
 	       #--split-sentences # TODO no need anymore, default is perform split sent

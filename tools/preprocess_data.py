@@ -65,7 +65,7 @@ class Encoder(object):
             if not nltk_available:
                 print("NLTK is not available to split sentences.")
                 exit()
-            if self.args.tokenizer_type == "BertWordPieceJp" or self.args.tokenizer_type.startswith('GPT2BPETokenizerJp'):
+            if self.args.tokenizer_type == "BertWordPieceCaseJp" or self.args.tokenizer_type == "BertWordPieceJp" or self.args.tokenizer_type.startswith('GPT2BPETokenizerJp'):
                 # TODO for japanese langugae's sentence split: 日文段落的分句：
                 #from nltk.tokenize import RegexpTokenizer
                 jp_sent_splitter = nltk.RegexpTokenizer(u'[^！？。]*[！？。]')
@@ -84,7 +84,7 @@ class Encoder(object):
             Encoder.splitter = IdentitySplitter()
 
     #def sent_split(self, text):
-    #    if args.tokenizer_type == "BertWordPieceJp":
+    #    if args.tokenizer_type == "BertWordPieceCaseJp":
     #        # TODO special sentence separator for Japanese language:
     #        print('TODO japanese sent split')
     #    else:
@@ -140,9 +140,9 @@ def get_args():
 
     group = parser.add_argument_group(title='tokenizer')
     group.add_argument('--tokenizer-type', type=str, required=False,
-                       #default='BertWordPieceJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
+                       #default='BertWordPieceCaseJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
                        default='GPT2BPETokenizerJp', # for japanese gpt2; 'GPT2BPETokenizer' is for english gpt2
-                       choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceJp',
+                       choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceCaseJp',
                                 'GPT2BPETokenizer', 'GPT2BPETokenizerJp', 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
     group.add_argument('--lowercase', action='store_true',

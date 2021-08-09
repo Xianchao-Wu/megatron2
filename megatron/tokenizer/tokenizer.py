@@ -39,7 +39,7 @@ def build_tokenizer(args):
     elif args.tokenizer_type == 'BertWordPieceCase':
         tokenizer = _BertWordPieceTokenizer(vocab_file=args.vocab_file,
                                             lower_case=False)
-    elif args.tokenizer_type == "BertWordPieceJp": # no need to separate "case" and "lowercase" for Jp -> NEED separate!!! NOTE
+    elif args.tokenizer_type == "BertWordPieceCaseJp": # no need to separate "case" and "lowercase" for Jp -> NEED separate!!! NOTE
         tokenizer = _BertWordPieceTokenizerJp(vocab_file=args.vocab_file, lower_case=args.lowercase, mecab_dict_path=args.mecab_dict_path)
     elif args.tokenizer_type == 'GPT2BPETokenizer':
         assert args.merge_file is not None # for english only, byte level bpe tokenizer is not fittable for japanese/chinese
