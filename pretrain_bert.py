@@ -165,3 +165,4 @@ if __name__ == "__main__":
     #import pdb; pdb.set_trace() # start debugging from here:
     pretrain(train_valid_test_datasets_provider, model_provider, forward_step,
              args_defaults={'tokenizer_type': 'BertWordPieceLowerCase'})
+    # NOTE this tokenizer.type is a bit dangerous... try to give 'tokenizer_type' a value!

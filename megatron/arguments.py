@@ -564,6 +564,7 @@ def _add_data_args(parser):
                        choices=['BertWordPieceLowerCase',
                                 'BertWordPieceCase',
                                 'BertWordPieceCaseJp',
+                                'BertWordPieceCaseCh',
                                 'GPT2BPETokenizer',
                                 'GPT2BPETokenizerJp',
                                 'GPT2BPETokenizerJpMecab'],

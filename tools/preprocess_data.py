@@ -70,6 +70,9 @@ class Encoder(object):
                 #from nltk.tokenize import RegexpTokenizer
                 jp_sent_splitter = nltk.RegexpTokenizer(u'[^！？。]*[！？。]')
                 Encoder.splitter = jp_sent_splitter
+            elif self.args.tokenizer_type == 'BertWordPieceCaseCh':
+                ch_sent_splitter = nltk.RegexpTokenizer(u'[^！？。]*[！？。]')
+                Encoder.splitter = ch_sent_splitter
             else:
                 splitter = nltk.load("tokenizers/punkt/english.pickle") # TODO other languages?
                 if self.args.keep_newlines:
@@ -142,7 +145,7 @@ def get_args():
     group.add_argument('--tokenizer-type', type=str, required=False,
                        #default='BertWordPieceCaseJp', # for japanese bert; #'BertWordPieceLowerCase' for english bert,
                        default='GPT2BPETokenizerJp', # for japanese gpt2; 'GPT2BPETokenizer' is for english gpt2
-                       choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceCaseJp',
+                       choices=['BertWordPieceLowerCase','BertWordPieceCase', 'BertWordPieceCaseJp', 'BertWordPieceCaseCh', 
                                 'GPT2BPETokenizer', 'GPT2BPETokenizerJp', 'GPT2BPETokenizerJpMecab'],
                        help='What type of tokenizer to use.')
     group.add_argument('--lowercase', action='store_true',
