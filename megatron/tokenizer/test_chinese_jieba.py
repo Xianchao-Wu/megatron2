@@ -19,7 +19,7 @@ print(", ".join(seg_list))
 seg_list = jieba.cut_for_search("小明硕士毕业于中国科学院计算所，后在日本京都大学深造")  # 搜索引擎模式
 print(", ".join(seg_list))
 
-seg_list = jieba.cut("小明硕士毕业于中国科学院计算所，后在日本京都大学深造")
+seg_list = jieba.cut("小明硕士毕业于中国科学院计算所，后在日本京都大学深造。他真是一位上进的好学生！")
 print('jieba seg default:' + ' '.join(seg_list))
             
 seg_list = jieba.cut("小明硕士毕业于中国科学院计算所，后在日本京都大学深造", cut_all=True)
