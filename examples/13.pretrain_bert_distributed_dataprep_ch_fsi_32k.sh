@@ -17,7 +17,8 @@
 #prefix="fsi-ja-bert-12files-bert-large-vocab-bwplc-debugonly"
 
 adir="/workspace/megatron/datasets/ch.finance.news.simp/"
-jsonfile=$adir"/12files.all.su.txt.10000lines.json"
+#jsonfile=$adir"/12files.all.su.txt.10000lines.json"
+jsonfile=$adir"/12files.all.su.txt.json"
 
 vocabfile=$adir"/12files.all.su.txt.jieba.vocab.32000.v3.bpe"
 
@@ -30,6 +31,7 @@ python tools/preprocess_data.py \
 	       --output-prefix $prefix \
 	       --vocab $vocabfile \
 	       --dataset-impl mmap \
+		   --workers 8 \
 	       --tokenizer-type BertWordPieceCaseCh #\
 	       #--tokenizer-type BertWordPieceJp #\
 	       #--tokenizer-type BertWordPieceLowerCase #\

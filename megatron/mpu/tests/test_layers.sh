@@ -6,4 +6,5 @@
 #########################################################################
 #!/bin/bash
 
-python -m pdb test_layers.py
+#python -m pdb test_layers.py
+python test_layers.py

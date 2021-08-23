@@ -16,12 +16,13 @@
 #vocabfile="/workspace/megatron/datasets/japanese-fsi/jp.fsi.8files.txt.vocab"
 #prefix="fsi-ja-bert-12files-bert-large-vocab-bwplc-debugonly"
 
-adir="/workspace/megatron/datasets/nttreso_qa/export/"
-jsonfile=$adir"/export_readable_20210727_simp_2read_v2.json"
+adir="/workspace/megatron/datasets/ch.finance.news.simp/"
+#jsonfile=$adir"/12files.all.su.txt.10000lines.json"
+jsonfile=$adir"/12files.all.su.txt.json"
 
-vocabfile=$adir"/export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe"
+vocabfile=$adir"/12files.all.su.txt.jieba.vocab.32000.v3.bpe"
 
-prefix="nttreso-ja-bert-vocab-32k-mecab-bpe-case"
+prefix="fsi-ch-bert-vocab-32k-jieba-bpe-case-worker1"
 
 # mecab+ipa -> bpe/wordpiece
 
@@ -30,6 +31,8 @@ python tools/preprocess_data.py \
 	       --output-prefix $prefix \
 	       --vocab $vocabfile \
 	       --dataset-impl mmap \
-	       --tokenizer-type BertWordPieceJp #\
+		   --workers 1 \
+	       --tokenizer-type BertWordPieceCaseCh #\
+	       #--tokenizer-type BertWordPieceJp #\
 	       #--tokenizer-type BertWordPieceLowerCase #\
 	       #--split-sentences # TODO no need anymore, default is perform split sent

@@ -6,22 +6,25 @@
 #########################################################################
 #!/bin/bash
 
-for afile in `git status | grep "modified" | grep ".py$" | awk 'BEGIN{FS=":"}{print $2}'`
-do
-	echo "git add $afile"
-	git add $afile
-done
+prockey(){
+	key=$1 # e.g., "modified"
 
-for afile in `git status | grep "modified" | grep ".sh$" | awk 'BEGIN{FS=":"}{print $2}'`
-do
-	echo "git add $afile"
-	git add $afile
-done
+	for ext in .py .sh .cpp
+	do
+		print $ext
+		for afile in `git status | grep -v ".pyc$" | grep $key | grep $ext"$" | awk 'BEGIN{FS=":"}{print $2}'`
+		do
+			echo "---git add $afile"
+			git add $afile
+		done
 
-for afile in `git status | grep "modified" | grep ".cpp$" | awk 'BEGIN{FS=":"}{print $2}'`
-do
-	echo "git add $afile"
-	git add $afile
-done
+		for afile in `git status | grep -v ":" | grep -v ".npy" | grep $ext"$" | awk '{print $1}'`
+		do
+			echo "===git add $afile"
+			git add $afile
+		done
+	done
+}
 
-
+prockey "modified"
+prockey "deleted"
