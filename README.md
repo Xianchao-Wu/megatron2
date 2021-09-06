@@ -1,3 +1,7 @@
+# Read Ja-BERT(https://github.com/Xianchao-Wu/megatron2/edit/main/README_nttreso.md) for NTT-reso Japanese BERT-large.
+
+# Megatron: General Introduction
+
 [Megatron](https://arxiv.org/pdf/1909.08053.pdf) is a large, powerful transformer developed by the Applied Deep Learning Research team at NVIDIA. This repository is for ongoing research on training large transformer language models at scale. We developed efficient, model-parallel (tensor and pipeline), and multi-node pre-training of [GPT](https://arxiv.org/abs/2005.14165) and [BERT](https://arxiv.org/pdf/1810.04805.pdf) using mixed precision.
 
 Below are some of the projects where we have directly used Megatron:
