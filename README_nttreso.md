@@ -1,9 +1,12 @@
 # for Japanese BERT using NTT-reso dataset
 Xianchao Wu (xianchaow@nvidia.com) 
 
+![Cases](images/bert-large-nttreso-loss.png)
+![Cases](images/bert-large-nttreso-ppl.png)
 
-## pytorch docker
-	* docker from nvidia:
+
+## 1. pytorch docker and Mecab
+docker from nvidia:
 	<pre>
 	\# docker pull nvcr.io/nvidia/pytorch:21.06-py3
     docker pull nvcr.io/nvidia/pytorch:20.12-py3
@@ -11,40 +14,57 @@ Xianchao Wu (xianchaow@nvidia.com)
 	sudo docker exec -it <container.id> /bin/bash
 	</pre>
 
-	/raid/xianchaow/megatron is my local path, please replace it with your server's path
-	megatron2 is placed in /raid/xianchaow/megatron
+/raid/xianchaow/megatron is my local path, please replace it with your server's path;
+
+megatron2 is placed in /raid/xianchaow/megatron
+
+Need to install Mecab+IPA dict in this docker
+
+	sudo apt install mecab
+	sudo apt install libmecab-dev
+	sudo apt install mecab-ipadic-utf8
 
 
-## checkpoint download
 
-	* [BERT Large](https://drive.google.com/drive/folders/1AdHNrt5pFexhf5uIXowO-dzZKmk2GyM3?usp=sharing)
-	* vocab size = 32k, Mecab + bpe (export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe)
-	* num-layers=24, hidden-size=1024, num-attention-heads=16, max-sequence-length=512
+## 2. checkpoint download
 
-## pretraining
-	* NOTE : run the following two base files at megatron2/ path, do not run them at megatron2/examples path.
+[BERT Large](https://drive.google.com/drive/folders/1AdHNrt5pFexhf5uIXowO-dzZKmk2GyM3?usp=sharing)
 
-	* data prepare: 
+vocab size = 32k, Mecab + bpe (export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe)
 
-	<pre>
-	cd megatron2
-	bash examples/12.pretrain_bert_distributed_dataprep_jp_nttreso_32k.sh
-	</pre>
+num-layers=24, hidden-size=1024, num-attention-heads=16, max-sequence-length=512
 
-	a json file with 1000 lines is prepared in examples/export_readable_20210727_simp_2read_v2_1000lines.json for reference.
-	after running this data preparation bash, a .bin and a .idx file will be generated for pretraining usage;
+## 3. pretraining
+NOTE : run the following two base files at megatron2/ path, do not run them at megatron2/examples path.
 
-	* pretraining 
+### data prepare: 
 
-	<pre>
-	cd megatron
-	examples/12.pretrain_bert_distributed_nttreso_jp_32k_mecab_bpe_case.sh
-	</pre>
+<pre>
+cd megatron2
+bash examples/12.pretrain_bert_distributed_dataprep_jp_nttreso_32k.sh
+</pre>
+
+a json file with 1000 lines is prepared in examples/export_readable_20210727_simp_2read_v2_1000lines.json for reference.
+after running this data preparation bash, a .bin and a .idx file will be generated for pretraining usage;
+
+### pretraining 
+
+<pre>
+cd megatron
+bash examples/12.pretrain_bert_distributed_nttreso_jp_32k_mecab_bpe_case.sh 
+</pre>
+currently run 10,000,000 iterations, please change it to 10 or smaller values for debug only.
 
 
-## fine-tuning
-	* please refer to the following fine-tuning hints for English. 
+## 4. fine-tuning
+please refer to the following fine-tuning hints for English. 
 
+
+	  end of ntt-reso bert readme.
+
+	  following is from official megatron.
+
+# Megatron: General Introduction
 
 [Megatron](https://arxiv.org/pdf/1909.08053.pdf) is a large, powerful transformer developed by the Applied Deep Learning Research team at NVIDIA. This repository is for ongoing research on training large transformer language models at scale. We developed efficient, model-parallel (tensor and pipeline), and multi-node pre-training of [GPT](https://arxiv.org/abs/2005.14165) and [BERT](https://arxiv.org/pdf/1810.04805.pdf) using mixed precision.
 
