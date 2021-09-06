@@ -11,13 +11,14 @@ WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 #DATA_PATH=<Specify path and file prefix>_text_sentence
 #CHECKPOINT_PATH=<Specify path>
 
-
-#DATA_PATH=/workspace/megatron/megatron2/fsi-en-bert-8files-bert-large-cased-vocab-bwplc_text_sentence
+# the file name for .bin and .idx, remove ".bin"/".idx" here:
 DATA_PATH=/workspace/megatron/megatron2/nttreso-ja-bert-vocab-32k-mecab-bpe-case_text_sentence
 
+# input and output checkpoint paths
 CHECKPOINT_PATH_IN=/workspace/megatron/ngc_models/release_bert_345m_cased_nttreso_jp_32k_mecab_bpe
 CHECKPOINT_PATH_OUT=/workspace/megatron/ngc_models/release_bert_345m_cased_nttreso_jp_32k_mecab_bpe
 
+# vocab file
 vocabfn=/workspace/megatron/datasets/nttreso_qa/export/export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe
 
 DISTRIBUTED_ARGS="--nproc_per_node $GPUS_PER_NODE --nnodes $NNODES --node_rank $NODE_RANK --master_addr $MASTER_ADDR --master_port $MASTER_PORT"

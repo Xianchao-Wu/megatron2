@@ -17,7 +17,8 @@
 #prefix="fsi-ja-bert-12files-bert-large-vocab-bwplc-debugonly"
 
 adir="/workspace/megatron/datasets/nttreso_qa/export/"
-jsonfile=$adir"/export_readable_20210727_simp_2read_v2.json"
+#jsonfile=$adir"/export_readable_20210727_simp_2read_v2.json"
+jsonfile="export_readable_20210727_simp_2read_v2_1000lines.json"
 
 vocabfile=$adir"/export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe"
 
