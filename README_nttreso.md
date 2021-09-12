@@ -30,13 +30,22 @@ Need to install Mecab+IPA dict in this docker
 
 [BERT 2 models](https://drive.google.com/drive/folders/1AdHNrt5pFexhf5uIXowO-dzZKmk2GyM3?usp=sharing)
 
-[BERT Large 345M](release_bert_345m_cased_nttreso_jp_32k_mecab_bpe)(https://drive.google.com/drive/folders/1JPJpdr0oL45UcL9Kx15R45MYHm0b3LN3?usp=sharing)
-[BERT Base 110M](release_bert_base_cased_nttreso_jp_32k_mecab_bpe)(https://drive.google.com/drive/folders/1pjI9zFFHMwB78pn2ZWX3yD0cmObaua-R?usp=sharing)
+[BERT Large 345M: release_bert_345m_cased_nttreso_jp_32k_mecab_bpe](https://drive.google.com/drive/folders/1JPJpdr0oL45UcL9Kx15R45MYHm0b3LN3?usp=sharing)
+
+	vocab size = 32k, Mecab + bpe (export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe)
+
+	num-layers=24, hidden-size=1024, num-attention-heads=16, max-sequence-length=512
 
 
-vocab size = 32k, Mecab + bpe (export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe)
 
-num-layers=24, hidden-size=1024, num-attention-heads=16, max-sequence-length=512
+
+[BERT Base 110M: release_bert_base_cased_nttreso_jp_32k_mecab_bpe](https://drive.google.com/drive/folders/1pjI9zFFHMwB78pn2ZWX3yD0cmObaua-R?usp=sharing)
+
+	vocab size = 32k, Mecab + bpe (export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe)
+
+	num-layers=12, hidden-size=768, num-attention-heads=12, max-sequence-length=512
+
+
 
 ## 3. pretraining
 NOTE : run the following two base files at megatron2/ path, do not run them at megatron2/examples path.
