@@ -1,4 +1,4 @@
-# Read Ja-BERT(https://github.com/Xianchao-Wu/megatron2/edit/main/README_nttreso.md) for NTT-reso Japanese BERT-large.
+# Read [Ja-BERT](https://github.com/Xianchao-Wu/megatron2/blob/main/README_nttreso.md) for NTT-reso Japanese BERT-large.
 
 # Megatron: General Introduction
 
