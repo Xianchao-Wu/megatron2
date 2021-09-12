@@ -28,7 +28,11 @@ Need to install Mecab+IPA dict in this docker
 
 ## 2. checkpoint download
 
-[BERT Large](https://drive.google.com/drive/folders/1AdHNrt5pFexhf5uIXowO-dzZKmk2GyM3?usp=sharing)
+[BERT 2 models](https://drive.google.com/drive/folders/1AdHNrt5pFexhf5uIXowO-dzZKmk2GyM3?usp=sharing)
+
+[BERT Large 345M](release_bert_345m_cased_nttreso_jp_32k_mecab_bpe)(https://drive.google.com/drive/folders/1JPJpdr0oL45UcL9Kx15R45MYHm0b3LN3?usp=sharing)
+[BERT Base 110M](release_bert_base_cased_nttreso_jp_32k_mecab_bpe)(https://drive.google.com/drive/folders/1pjI9zFFHMwB78pn2ZWX3yD0cmObaua-R?usp=sharing)
+
 
 vocab size = 32k, Mecab + bpe (export_readable_20210727_simp_2read_v3.mecab.txt.vocab.32000.v3.bpe)
 
